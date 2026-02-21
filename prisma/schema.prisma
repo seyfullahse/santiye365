@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── KULLANICI ───────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  comments      ActivityComment[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+// ─── PROJELER ────────────────────────────────────────────
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  client      String?
+  startDate   DateTime?     @map("start_date")
+  endDate     DateTime?     @map("end_date")
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  zones       Zone[]
+  floors      Floor[]
+  activities  Activity[]
+  risks       Risk[]
+  workforce   WorkforceDaily[]
+  materials   MaterialItem[]
+
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+// ─── MAHALLER (ZONE / ALAN) ──────────────────────────────
+model Zone {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  floors      Floor[]
+  activities  Activity[]
+  materials   MaterialItem[]
+
+  @@map("zones")
+}
+
+// ─── KATLAR ──────────────────────────────────────────────
+model Floor {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  zoneId    String   @map("zone_id")
+  name      String
+  orderNo   Int      @default(0) @map("order_no")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  activities Activity[]
+  materials  MaterialItem[]
+
+  @@map("floors")
+}
+
+// ─── DİSİPLİNLER ────────────────────────────────────────
+model Discipline {
+  id   String @id @default(cuid())
+  name String @unique
+
+  activities Activity[]
+  teams      Team[]
+
+  @@map("disciplines")
+}
+
+// ─── AKTİVİTELER (ANA TABLO) ────────────────────────────
+model Activity {
+  id              String   @id @default(cuid())
+  projectId       String   @map("project_id")
+  zoneId          String   @map("zone_id")
+  floorId         String   @map("floor_id")
+  disciplineId    String   @map("discipline_id")
+
+  orderNo         Int      @default(0) @map("order_no")
+
+  name            String
+  weight          Float    @default(0)
+  progressPercent Float    @default(0) @map("progress_percent")
+
+  plannedStart    DateTime?  @map("planned_start")
+  plannedFinish   DateTime?  @map("planned_finish")
+  forecastFinish  DateTime?  @map("forecast_finish")
+  actualFinish    DateTime?  @map("actual_finish")
+
+  isCritical      Boolean  @default(false) @map("is_critical")
+  status          ActivityStatus @default(NOT_STARTED)
+  notes           String?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  floor      Floor      @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  discipline Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  approvals  Approval[]
+  risks      Risk[]
+  comments   ActivityComment[]
+
+  @@map("activities")
+}
+
+enum ActivityStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+  ON_HOLD
+}
+
+// ─── ONAYLAR ─────────────────────────────────────────────
+model Approval {
+  id          String         @id @default(cuid())
+  activityId  String         @map("activity_id")
+  title       String
+  waitingOn   String?        @map("waiting_on")
+  waitingDays Int            @default(0) @map("waiting_days")
+  impactType  ImpactType     @default(DURATION) @map("impact_type")
+  note        String?
+  status      ApprovalStatus @default(WAITING)
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  activity    Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@map("approvals")
+}
+
+enum ApprovalStatus {
+  WAITING
+  RESOLVED
+}
+
+enum ImpactType {
+  DURATION
+  COST
+  BOTH
+}
+
+// ─── RİSKLER ─────────────────────────────────────────────
+model Risk {
+  id          String     @id @default(cuid())
+  projectId   String     @map("project_id")
+  activityId  String?    @map("activity_id")
+
+  title       String
+  impact      Int        @default(1)
+  probability Int        @default(1)
+  score       Int        @default(1)
+  action      String?
+  responsible String?
+  status      RiskStatus @default(OPEN)
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@map("risks")
+}
+
+enum RiskStatus {
+  OPEN
+  MITIGATED
+  CLOSED
+}
+
+// ─── AKTİVİTE YORUMLARI ─────────────────────────────────
+model ActivityComment {
+  id         String   @id @default(cuid())
+  activityId String   @map("activity_id")
+  text       String
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [createdBy], references: [id])
+
+  @@map("activity_comments")
+}
+
+// ─── ŞİRKETLER ───────────────────────────────────────────
+model Company {
+  id        String      @id @default(cuid())
+  name      String
+  type      CompanyType @default(SUBCONTRACTOR)
+  sortOrder Int         @default(0) @map("sort_order")
+
+  teams Team[]
+
+  @@map("companies")
+}
+
+enum CompanyType {
+  SUBCONTRACTOR
+  MAIN
+  MANAGEMENT
+}
+
+// ─── EKİPLER ─────────────────────────────────────────────
+model Team {
+  id           String @id @default(cuid())
+  companyId    String @map("company_id")
+  name         String
+  disciplineId String @map("discipline_id")
+  sortOrder    Int    @default(0) @map("sort_order")
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  discipline Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  workforce  WorkforceDaily[]
+  workers    Worker[]
+
+  @@map("teams")
+}
+
+// ─── ÇALIŞANLAR ──────────────────────────────────────────
+model Worker {
+  id        String   @id @default(cuid())
+  teamId    String   @map("team_id")
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  role      String                          // Görevi (Kalıpçı, Formen, Elektrikçi vb.)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  team        Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  attendances Attendance[]
+
+  @@map("workers")
+}
+
+// ─── PUANTAJ (GÜNLÜK YOKLAMA) ────────────────────────────
+model Attendance {
+  id         String           @id @default(cuid())
+  workerId   String           @map("worker_id")
+  date       DateTime         @db.Date
+  shift      ShiftType        @default(DAY)                    // Vardiya
+  status     AttendanceStatus @default(ABSENT)
+  totalHours Float            @default(0) @map("total_hours")   // Toplam çalışma saati
+  overtime   Float            @default(0)                       // Mesai saati
+  note       String?
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  worker     Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, date, shift])
+  @@map("attendances")
+}
+
+enum ShiftType {
+  DAY        // Gündüz
+  NIGHT      // Gece
+}
+
+enum AttendanceStatus {
+  PRESENT       // Geldi
+  HALF_DAY      // Yarım gün
+  ABSENT        // Gelmedi (mazeretsiz)
+  PAID_LEAVE    // Ücretli izin
+  UNPAID_LEAVE  // Ücretsiz izin
+  ANNUAL_LEAVE  // Yıllık izin
+  SICK_LEAVE    // Raporlu
+  DAY_OFF       // Hafta tatili
+}
+
+// ─── MALZEME TAKİP ───────────────────────────────────────
+model MaterialItem {
+  id               String   @id @default(cuid())
+  projectId        String   @map("project_id")
+  zoneId           String   @map("zone_id")
+  floorId          String   @map("floor_id")
+
+  pozNo            String   @map("poz_no")
+  orderPriority    Int      @default(0) @map("order_priority")
+  scope            String                                      // İşin kapsamı
+  unit             String                                      // Birim (m², adet, kg…)
+  quantity         Float    @default(0)                        // Sipariş miktarı (kat bazlı)
+
+  // Tasarım ve Malzeme Onay Süreci
+  designApproval   MaterialApprovalStatus @default(BEKLEMEDE) @map("design_approval")
+  ownerApproval    MaterialApprovalStatus @default(BEKLEMEDE) @map("owner_approval")
+  approvalNote     String?  @map("approval_note")              // Durum / Karar (onay)
+
+  // Malzeme Sipariş Süreci
+  quotationFirms   String?  @map("quotation_firms")            // Teklif firmaları (metin)
+  orderDecision    String?  @map("order_decision")             // Durum / Karar (sipariş)
+
+  // Ürün Siparişi ve Teslimi
+  supplierName     String?  @map("supplier_name")
+  supplierContact  String?  @map("supplier_contact")
+  orderStatus      MaterialOrderStatus    @default(BEKLEMEDE)  @map("order_status")
+  deliveryStatus   MaterialDeliveryStatus @default(BEKLEMEDE)  @map("delivery_status")
+  responsiblePerson String? @map("responsible_person")
+
+  note             String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt     @map("updated_at")
+
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  zone             Zone     @relation(fields: [zoneId],    references: [id], onDelete: Cascade)
+  floor            Floor    @relation(fields: [floorId],   references: [id], onDelete: Cascade)
+
+  @@map("material_items")
+}
+
+enum MaterialApprovalStatus {
+  BEKLEMEDE
+  ONAYLANDI
+  REDDEDILDI
+  REVIZE
+}
+
+enum MaterialOrderStatus {
+  BEKLEMEDE
+  SIPARIS_VERILDI
+  URETIMDE
+  HAZIRLANDI
+  IPTAL
+}
+
+enum MaterialDeliveryStatus {
+  BEKLEMEDE
+  YOLDA
+  TESLIM_EDILDI
+  EKSIK_TESLIM
+  IPTAL
+}
+
+// ─── GÜNLÜK PERSONEL ─────────────────────────────────────
+model WorkforceDaily {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  date        DateTime @db.Date
+  teamId      String   @map("team_id")
+  workerCount Int      @default(0) @map("worker_count")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team    Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, date, teamId])
+  @@map("workforce_daily")
+}
