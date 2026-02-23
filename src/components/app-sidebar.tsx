@@ -11,15 +11,18 @@ import {
   Activity,
   CheckCircle2,
   AlertTriangle,
-  Users,
-  Building2,
   HardHat,
-  UserCheck,
   LogOut,
   Menu,
   Settings,
   Package,
+  Home,
+  BarChart3,
+  Building2,
+  Users,
+  UserCheck,
   ClipboardList,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -28,26 +31,29 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
+/* ─────── Navigasyon Öğeleri ─────── */
 const navigation = [
   { name: "Gösterge Paneli", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projeler", href: "/projeler", icon: FolderKanban },
   { name: "Mahaller", href: "/mahaller", icon: MapPin },
   { name: "Katlar", href: "/katlar", icon: Layers },
   { name: "Aktiviteler", href: "/aktiviteler", icon: Activity },
-  { name: "Malzemeler", href: "/malzemeler", icon: Package },
+  { name: "Malzeme Takip", href: "/malzemeler", icon: Package },
   { name: "Onaylar", href: "/onaylar", icon: CheckCircle2 },
   { name: "Riskler", href: "/riskler", icon: AlertTriangle },
+  { name: "Hakediş", href: "/hakedis", icon: FileText },
   { name: "Şirketler", href: "/sirketler", icon: Building2 },
   { name: "Ekipler", href: "/ekipler", icon: Users },
   { name: "Çalışanlar", href: "/calisanlar", icon: UserCheck },
+  { name: "Günlük Personel", href: "/personel", icon: HardHat },
   { name: "Puantaj", href: "/puantaj", icon: ClipboardList },
-  { name: "Personel", href: "/personel", icon: HardHat },
 ];
 
 const adminNavigation = [
   { name: "Ayarlar", href: "/ayarlar", icon: Settings },
 ];
 
+/* ─────── SIDEBAR CONTENT ─────── */
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { data: session } = useSession();
@@ -81,14 +87,49 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-2 lg:gap-3 px-4 lg:px-6 py-4 lg:py-6">
+      <Link
+        href="/"
+        className="flex items-center gap-2 lg:gap-3 px-4 lg:px-6 py-4 lg:py-6 hover:opacity-80 transition-opacity"
+      >
         <HardHat className="h-7 w-7 lg:h-10 lg:w-10 text-primary" />
         <span className="text-lg lg:text-2xl font-bold">Şantiye360</span>
-      </div>
+      </Link>
       <Separator />
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      {/* Üst Navigasyon */}
+      <div className="px-3 pt-3 pb-1 space-y-0.5">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+            pathname === "/"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          )}
+        >
+          <Home className="h-5 w-5" />
+          Ana Sayfa
+        </Link>
+        <Link
+          href="/yonetim-paneli"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+            pathname.startsWith("/yonetim-paneli")
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          )}
+        >
+          <BarChart3 className="h-5 w-5" />
+          Yönetici Paneli
+        </Link>
+      </div>
+
+      <Separator className="mx-3 my-1" />
+
+      {/* Navigasyon */}
+      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
         {navigation.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
@@ -109,9 +150,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
 
+        {/* Admin bölümü */}
         {session?.user?.role === "ADMIN" && (
           <>
-            <div className="my-2 mx-3 border-t" />
+            <Separator className="my-2" />
             {adminNavigation.map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
@@ -174,7 +216,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => signOut({ redirectTo: "/giris" })}
+            onClick={() => signOut({ callbackUrl: "/giris" })}
             title="Çıkış yap"
           >
             <LogOut className="h-4 w-4" />
@@ -185,6 +227,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/* ─────── EXPORTED COMPONENT ─────── */
 export function AppSidebar() {
   const [open, setOpen] = useState(false);
 
@@ -203,10 +246,10 @@ export function AppSidebar() {
             <SidebarContent onNavigate={() => setOpen(false)} />
           </SheetContent>
         </Sheet>
-        <div className="ml-3 flex items-center gap-2">
+        <Link href="/" className="ml-3 flex items-center gap-2">
           <HardHat className="h-6 w-6 text-primary" />
           <span className="text-base font-bold">Şantiye360</span>
-        </div>
+        </Link>
       </div>
 
       {/* Desktop sidebar */}

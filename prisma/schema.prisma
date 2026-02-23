@@ -44,6 +44,7 @@ model Project {
   risks       Risk[]
   workforce   WorkforceDaily[]
   materials   MaterialItem[]
+  hakedisler  Hakedis[]
 
   @@map("projects")
 }
@@ -222,6 +223,7 @@ model Company {
   sortOrder Int         @default(0) @map("sort_order")
 
   teams Team[]
+  hakedisler Hakedis[]
 
   @@map("companies")
 }
@@ -376,4 +378,76 @@ model WorkforceDaily {
 
   @@unique([projectId, date, teamId])
   @@map("workforce_daily")
+}
+
+// ─── HAKEDİŞ ─────────────────────────────────────────────
+model Hakedis {
+  id                String        @id @default(cuid())
+  projectId         String        @map("project_id")
+  companyId         String?       @map("company_id")
+  type              HakedisType
+  no                Int                                        // Hakediş no (sıralı)
+  period            String                                     // "Ocak 2026"
+  startDate         DateTime?     @map("start_date")
+  endDate           DateTime?     @map("end_date")
+
+  // Tutarlar
+  totalAmount       Float         @default(0) @map("total_amount")
+  previousAmount    Float         @default(0) @map("previous_amount")
+  currentAmount     Float         @default(0) @map("current_amount")
+
+  // Kesintiler
+  advanceDeduction  Float         @default(0) @map("advance_deduction")
+  retentionRate     Float         @default(0) @map("retention_rate")
+  retentionAmount   Float         @default(0) @map("retention_amount")
+  stampTax          Float         @default(0) @map("stamp_tax")
+  otherDeduction    Float         @default(0) @map("other_deduction")
+
+  netAmount         Float         @default(0) @map("net_amount")
+  status            HakedisStatus @default(DRAFT)
+  notes             String?
+
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  project           Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  company           Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  items             HakedisItem[]
+
+  @@map("hakedis")
+}
+
+enum HakedisType {
+  ISVEREN
+  TASERON
+}
+
+enum HakedisStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PAID
+}
+
+// ─── HAKEDİŞ KALEMLERİ ──────────────────────────────────
+model HakedisItem {
+  id              String   @id @default(cuid())
+  hakedisId       String   @map("hakedis_id")
+
+  pozNo           String   @map("poz_no")
+  description     String
+  unit            String
+  contractQty     Float    @default(0) @map("contract_qty")
+  unitPrice       Float    @default(0) @map("unit_price")
+  previousQty     Float    @default(0) @map("previous_qty")
+  currentQty      Float    @default(0) @map("current_qty")
+  cumulativeQty   Float    @default(0) @map("cumulative_qty")
+  amount          Float    @default(0)
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  hakedis         Hakedis  @relation(fields: [hakedisId], references: [id], onDelete: Cascade)
+
+  @@map("hakedis_items")
 }
