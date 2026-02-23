@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const { userName } = await req.json();
 
     // ── Collect all real data from DB ──

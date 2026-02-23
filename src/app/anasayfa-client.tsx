@@ -799,12 +799,12 @@ function AIView({ userName, userEmail, kpiData }: AnasayfaProps) {
 function ViewToggle({ mode, onChange }: { mode: "classic" | "ai"; onChange: (m: "classic" | "ai") => void }) {
   return (
     <div className="fixed top-[60px] left-1/2 -translate-x-1/2 z-[60]">
-      <div className="flex items-center gap-1 p-1 rounded-full bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50">
-        <button onClick={() => onChange("classic")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${mode === "classic" ? "bg-white text-black shadow-lg" : "text-white/50 hover:text-white/80"}`}>
-          <Monitor className="h-3.5 w-3.5" />Klasik
+      <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-full bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50">
+        <button onClick={() => onChange("classic")} className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all duration-300 ${mode === "classic" ? "bg-white text-black shadow-lg" : "text-white/50 hover:text-white/80"}`}>
+          <Monitor className="h-3 w-3 sm:h-3.5 sm:w-3.5" />Klasik
         </button>
-        <button onClick={() => onChange("ai")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${mode === "ai" ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/30" : "text-white/50 hover:text-white/80"}`}>
-          <Sparkles className="h-3.5 w-3.5" />AI Sunum
+        <button onClick={() => onChange("ai")} className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all duration-300 ${mode === "ai" ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/30" : "text-white/50 hover:text-white/80"}`}>
+          <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5" />AI Sunum
         </button>
       </div>
     </div>
