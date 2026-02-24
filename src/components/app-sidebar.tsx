@@ -216,7 +216,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => signOut({ callbackUrl: "/giris" })}
+            onClick={() => signOut({ redirectTo: "/giris" })}
             title="Çıkış yap"
           >
             <LogOut className="h-4 w-4" />

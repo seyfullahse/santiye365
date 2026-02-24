@@ -334,7 +334,7 @@ function ClassicView({ userName, userEmail, kpiData, recentActivities }: Anasayf
             <Avatar className="h-8 w-8">
               <AvatarFallback className="text-xs font-semibold">{userName.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <button onClick={() => signOut({ callbackUrl: "/giris" })} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Çıkış Yap">
+            <button onClick={() => signOut({ redirectTo: "/giris" })} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Çıkış Yap">
               <LogOut className="h-4 w-4" />
             </button>
           </div>
@@ -717,7 +717,7 @@ function AIView({ userName, userEmail, kpiData }: AnasayfaProps) {
             {aiLoading && (<div className="flex items-center gap-1.5 text-[10px] text-violet-400 mr-2"><Bot className="h-3 w-3 animate-pulse" /><span className="hidden sm:inline">AI analiz ediyor...</span></div>)}
             <div className="hidden sm:block text-right"><p className="text-xs font-medium text-white/80">{userName}</p><p className="text-[10px] text-white/30">{userEmail}</p></div>
             <Avatar className="h-8 w-8 border border-white/10"><AvatarFallback className="bg-white/5 text-white/60 text-xs font-semibold">{userName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
-            <button onClick={() => signOut({ callbackUrl: "/giris" })} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors text-white/40 hover:text-white/80" title="Çıkış Yap"><LogOut className="h-4 w-4" /></button>
+            <button onClick={() => signOut({ redirectTo: "/giris" })} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors text-white/40 hover:text-white/80" title="Çıkış Yap"><LogOut className="h-4 w-4" /></button>
           </motion.div>
         </div>
       </header>
