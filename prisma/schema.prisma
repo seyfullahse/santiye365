@@ -45,6 +45,8 @@ model Project {
   workforce   WorkforceDaily[]
   materials   MaterialItem[]
   hakedisler  Hakedis[]
+  employees   Employee[]
+  accidents   WorkAccident[]
 
   @@map("projects")
 }
@@ -224,6 +226,7 @@ model Company {
 
   teams Team[]
   hakedisler Hakedis[]
+  employees  Employee[]
 
   @@map("companies")
 }
@@ -247,6 +250,7 @@ model Team {
 
   workforce  WorkforceDaily[]
   workers    Worker[]
+  employees  Employee[]
 
   @@map("teams")
 }
@@ -450,4 +454,550 @@ model HakedisItem {
   hakedis         Hakedis  @relation(fields: [hakedisId], references: [id], onDelete: Cascade)
 
   @@map("hakedis_items")
+}
+
+// ═══════════════════════════════════════════════════════════
+// İK + İSG ORTAK TABAN
+// ═══════════════════════════════════════════════════════════
+
+// ─── DEPARTMANLAR ────────────────────────────────────────
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  employees Employee[]
+  positions Position[]
+
+  @@map("departments")
+}
+
+// ─── POZİSYONLAR ────────────────────────────────────────
+model Position {
+  id           String   @id @default(cuid())
+  departmentId String   @map("department_id")
+  name         String
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  employees    Employee[]
+
+  @@map("positions")
+}
+
+// ─── ÇALIŞANLAR (ORTAK TABAN) ────────────────────────────
+model Employee {
+  id                String   @id @default(cuid())
+
+  // Kişisel Bilgiler
+  firstName         String   @map("first_name")
+  lastName          String   @map("last_name")
+  tcNo              String?  @unique @map("tc_no")
+  birthDate         DateTime? @map("birth_date") @db.Date
+  birthPlace        String?  @map("birth_place")
+  gender            Gender?
+  maritalStatus     MaritalStatus? @map("marital_status")
+  bloodType         BloodType? @map("blood_type")
+  phone             String?
+  email             String?
+  address           String?
+
+  // Acil Durum
+  emergencyName     String?  @map("emergency_name")
+  emergencyPhone    String?  @map("emergency_phone")
+  emergencyRelation String?  @map("emergency_relation")
+
+  // Organizasyon
+  companyId         String?  @map("company_id")
+  departmentId      String?  @map("department_id")
+  positionId        String?  @map("position_id")
+  projectId         String?  @map("project_id")
+  teamId            String?  @map("team_id")
+  managerId         String?  @map("manager_id")
+
+  // İş Bilgileri
+  employeeNo        String?  @unique @map("employee_no")
+  hireDate          DateTime? @map("hire_date") @db.Date
+  sgkStartDate      DateTime? @map("sgk_start_date") @db.Date
+  sgkNo             String?  @map("sgk_no")
+
+  // Maaş
+  salary            Float?   @default(0)
+  salaryType        SalaryType? @map("salary_type")
+
+  // Durum
+  status            EmployeeStatus @default(ACTIVE)
+  exitDate          DateTime? @map("exit_date") @db.Date
+  exitReason        ExitReason? @map("exit_reason")
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Organizasyon İlişkileri
+  company           Company?    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  department        Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  position          Position?   @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  project           Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  team              Team?       @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  manager           Employee?   @relation("ManagerSubordinates", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates      Employee[]  @relation("ManagerSubordinates")
+
+  // İK İlişkileri
+  contracts         Contract[]
+  documents         EmployeeDocument[]
+  leaveRequests     LeaveRequest[]
+  leaveBalances     LeaveBalance[]
+  disciplineRecords DisciplineRecord[]
+  performanceReviews PerformanceReview[]
+  positionHistory   PositionHistory[]
+
+  // İSG İlişkileri
+  trainings         EmployeeTraining[]
+  certificates      Certificate[]
+  medicalExams      MedicalExam[]
+  ppeAssignments    PPEAssignment[]
+  accidents         WorkAccidentEmployee[]
+
+  @@map("employees")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+}
+
+enum BloodType {
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+  O_POS
+  O_NEG
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  PASSIVE
+  ON_LEAVE
+  SUSPENDED
+}
+
+enum SalaryType {
+  MONTHLY
+  DAILY
+  HOURLY
+}
+
+enum ExitReason {
+  RESIGNATION
+  TERMINATION
+  MUTUAL
+  RETIREMENT
+  CONTRACT_END
+  OTHER
+}
+
+// ═══════════════════════════════════════════════════════════
+// İK MODÜLÜ
+// ═══════════════════════════════════════════════════════════
+
+// ─── SÖZLEŞMELER ─────────────────────────────────────────
+model Contract {
+  id           String         @id @default(cuid())
+  employeeId   String         @map("employee_id")
+  type         ContractType
+  startDate    DateTime       @map("start_date") @db.Date
+  endDate      DateTime?      @map("end_date") @db.Date
+  salary       Float          @default(0)
+  notes        String?
+  status       ContractStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("contracts")
+}
+
+enum ContractType {
+  INDEFINITE
+  FIXED_TERM
+  PART_TIME
+  TRIAL
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+// ─── EVRAKLAR ────────────────────────────────────────────
+model EmployeeDocument {
+  id           String       @id @default(cuid())
+  employeeId   String       @map("employee_id")
+  type         DocumentType
+  name         String
+  fileUrl      String?      @map("file_url")
+  expiryDate   DateTime?    @map("expiry_date") @db.Date
+  notes        String?
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_documents")
+}
+
+enum DocumentType {
+  KIMLIK
+  DIPLOMA
+  SAGLIK_RAPORU
+  ADLI_SICIL
+  IKAMETGAH
+  SGK_BILDIRGE
+  SOZLESME
+  EHLIYET
+  SERTIFIKA
+  DIGER
+}
+
+// ─── İZİN TALEPLERİ ─────────────────────────────────────
+model LeaveRequest {
+  id            String        @id @default(cuid())
+  employeeId    String        @map("employee_id")
+  type          LeaveType
+  startDate     DateTime      @map("start_date") @db.Date
+  endDate       DateTime      @map("end_date") @db.Date
+  totalDays     Float         @map("total_days")
+  reason        String?
+  status        RequestStatus @default(PENDING)
+  approvedBy    String?       @map("approved_by")
+  approvedAt    DateTime?     @map("approved_at")
+  rejectionNote String?       @map("rejection_note")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("leave_requests")
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  MATERNITY
+  PATERNITY
+  MARRIAGE
+  BEREAVEMENT
+  UNPAID
+  COMPENSATION
+  OTHER_LEAVE
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// ─── İZİN BAKİYELERİ ────────────────────────────────────
+model LeaveBalance {
+  id            String   @id @default(cuid())
+  employeeId    String   @map("employee_id")
+  year          Int
+  totalDays     Float    @default(14) @map("total_days")
+  usedDays      Float    @default(0)  @map("used_days")
+  remainingDays Float    @default(14) @map("remaining_days")
+
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, year])
+  @@map("leave_balances")
+}
+
+// ─── DİSİPLİN KAYITLARI ─────────────────────────────────
+model DisciplineRecord {
+  id           String         @id @default(cuid())
+  employeeId   String         @map("employee_id")
+  type         DisciplineType
+  date         DateTime       @db.Date
+  description  String
+  action       String?
+  notes        String?
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("discipline_records")
+}
+
+enum DisciplineType {
+  VERBAL_WARNING
+  WRITTEN_WARNING
+  SUSPENSION
+  FINE
+  TERMINATION_NOTICE
+}
+
+// ─── PERFORMANS DEĞERLENDİRME ───────────────────────────
+model PerformanceReview {
+  id           String       @id @default(cuid())
+  employeeId   String       @map("employee_id")
+  period       String
+  reviewerId   String?      @map("reviewer_id")
+  score        Float?       @default(0)
+  notes        String?
+  status       ReviewStatus @default(DRAFT)
+  reviewDate   DateTime?    @map("review_date") @db.Date
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("performance_reviews")
+}
+
+enum ReviewStatus {
+  DRAFT
+  SUBMITTED
+  COMPLETED
+}
+
+// ─── POZİSYON GEÇMİŞİ ──────────────────────────────────
+model PositionHistory {
+  id             String             @id @default(cuid())
+  employeeId     String             @map("employee_id")
+  changeType     PositionChangeType @map("change_type")
+  fromPosition   String?            @map("from_position")
+  toPosition     String             @map("to_position")
+  fromDepartment String?            @map("from_department")
+  toDepartment   String?            @map("to_department")
+  fromSalary     Float?             @map("from_salary")
+  toSalary       Float?             @map("to_salary")
+  effectiveDate  DateTime           @map("effective_date") @db.Date
+  notes          String?
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("position_history")
+}
+
+enum PositionChangeType {
+  HIRE
+  PROMOTION
+  DEMOTION
+  TRANSFER
+  SALARY_CHANGE
+  DEPARTMENT_CHANGE
+}
+
+// ═══════════════════════════════════════════════════════════
+// İSG MODÜLÜ
+// ═══════════════════════════════════════════════════════════
+
+// ─── EĞİTİM TANIMLARI ───────────────────────────────────
+model TrainingDefinition {
+  id              String           @id @default(cuid())
+  name            String
+  description     String?
+  durationHours   Float            @default(0) @map("duration_hours")
+  isMandatory     Boolean          @default(false) @map("is_mandatory")
+  validityMonths  Int?             @map("validity_months")
+  category        TrainingCategory @default(ISG)
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  trainings       EmployeeTraining[]
+
+  @@map("training_definitions")
+}
+
+enum TrainingCategory {
+  ISG
+  TECHNICAL
+  PROFESSIONAL
+  ORIENTATION
+}
+
+// ─── ÇALIŞAN EĞİTİMLERİ ─────────────────────────────────
+model EmployeeTraining {
+  id                String         @id @default(cuid())
+  employeeId        String         @map("employee_id")
+  trainingId        String         @map("training_id")
+  trainingDate      DateTime       @map("training_date") @db.Date
+  expiryDate        DateTime?      @map("expiry_date") @db.Date
+  status            TrainingStatus @default(PLANNED)
+  score             Float?
+  certificateUrl    String?        @map("certificate_url")
+  notes             String?
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  employee          Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  training          TrainingDefinition @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+
+  @@map("employee_trainings")
+}
+
+enum TrainingStatus {
+  PLANNED
+  COMPLETED_TRAINING
+  FAILED
+  EXPIRED_TRAINING
+}
+
+// ─── SERTİFİKALAR ───────────────────────────────────────
+model Certificate {
+  id           String            @id @default(cuid())
+  employeeId   String            @map("employee_id")
+  name         String
+  issuedBy     String?           @map("issued_by")
+  issueDate    DateTime          @map("issue_date") @db.Date
+  expiryDate   DateTime?         @map("expiry_date") @db.Date
+  fileUrl      String?           @map("file_url")
+  status       CertificateStatus @default(VALID)
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("certificates")
+}
+
+enum CertificateStatus {
+  VALID
+  EXPIRED_CERT
+  REVOKED
+}
+
+// ─── PERİYODİK MUAYENE ──────────────────────────────────
+model MedicalExam {
+  id           String     @id @default(cuid())
+  employeeId   String     @map("employee_id")
+  type         ExamType
+  examDate     DateTime   @map("exam_date") @db.Date
+  nextExamDate DateTime?  @map("next_exam_date") @db.Date
+  result       ExamResult @default(PENDING_EXAM)
+  hospital     String?
+  doctorName   String?    @map("doctor_name")
+  fileUrl      String?    @map("file_url")
+  notes        String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("medical_exams")
+}
+
+enum ExamType {
+  ENTRY
+  PERIODIC
+  EXIT_EXAM
+  RETURN
+}
+
+enum ExamResult {
+  PENDING_EXAM
+  FIT
+  CONDITIONAL
+  UNFIT
+}
+
+// ─── KKD TÜRLERİ ────────────────────────────────────────
+model PPEType {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  category     String?
+  validityDays Int?     @map("validity_days")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  assignments  PPEAssignment[]
+
+  @@map("ppe_types")
+}
+
+// ─── KKD ZİMMET ──────────────────────────────────────────
+model PPEAssignment {
+  id           String    @id @default(cuid())
+  employeeId   String    @map("employee_id")
+  ppeTypeId    String    @map("ppe_type_id")
+  assignDate   DateTime  @map("assign_date") @db.Date
+  returnDate   DateTime? @map("return_date") @db.Date
+  expiryDate   DateTime? @map("expiry_date") @db.Date
+  serialNo     String?   @map("serial_no")
+  status       PPEStatus @default(ASSIGNED)
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  ppeType      PPEType  @relation(fields: [ppeTypeId], references: [id], onDelete: Cascade)
+
+  @@map("ppe_assignments")
+}
+
+enum PPEStatus {
+  ASSIGNED
+  RETURNED
+  LOST
+  DAMAGED
+  EXPIRED_PPE
+}
+
+// ─── İŞ KAZALARI ─────────────────────────────────────────
+model WorkAccident {
+  id               String           @id @default(cuid())
+  projectId        String?          @map("project_id")
+  date             DateTime         @db.Date
+  time             String?
+  location         String?
+  description      String
+  severity         AccidentSeverity
+  lostDays         Int              @default(0) @map("lost_days")
+  rootCause        String?          @map("root_cause")
+  correctiveAction String?          @map("corrective_action")
+  reportedToSGK    Boolean          @default(false) @map("reported_to_sgk")
+  status           AccidentStatus   @default(OPEN_ACCIDENT)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  involvedEmployees WorkAccidentEmployee[]
+
+  @@map("work_accidents")
+}
+
+model WorkAccidentEmployee {
+  id           String @id @default(cuid())
+  accidentId   String @map("accident_id")
+  employeeId   String @map("employee_id")
+  injuryType   String? @map("injury_type")
+  injuryPart   String? @map("injury_part")
+
+  accident     WorkAccident @relation(fields: [accidentId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("work_accident_employees")
+}
+
+enum AccidentSeverity {
+  NEAR_MISS
+  MINOR
+  MODERATE
+  SERIOUS
+  FATAL
+}
+
+enum AccidentStatus {
+  OPEN_ACCIDENT
+  INVESTIGATING
+  CLOSED_ACCIDENT
 }

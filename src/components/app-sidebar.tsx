@@ -23,6 +23,18 @@ import {
   UserCheck,
   ClipboardList,
   FileText,
+  UserPlus,
+  Briefcase,
+  CalendarDays,
+  FolderOpen,
+  Scale,
+  TrendingUp,
+  Shield,
+  GraduationCap,
+  Award,
+  Stethoscope,
+  HardHat as HelmetIcon,
+  Siren,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -31,8 +43,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
-/* ─────── Navigasyon Öğeleri ─────── */
-const navigation = [
+/* ─────── Proje Yönetimi Navigasyonu ─────── */
+const projectNavigation = [
   { name: "Gösterge Paneli", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projeler", href: "/projeler", icon: FolderKanban },
   { name: "Mahaller", href: "/mahaller", icon: MapPin },
@@ -49,6 +61,28 @@ const navigation = [
   { name: "Puantaj", href: "/puantaj", icon: ClipboardList },
 ];
 
+/* ─────── İK Navigasyonu ─────── */
+const ikNavigation = [
+  { name: "İK Özet", href: "/ik", icon: BarChart3 },
+  { name: "Personel", href: "/ik/personel", icon: UserPlus },
+  { name: "Departmanlar", href: "/ik/departmanlar", icon: Building2 },
+  { name: "Pozisyonlar", href: "/ik/pozisyonlar", icon: Briefcase },
+  { name: "İzin Yönetimi", href: "/ik/izinler", icon: CalendarDays },
+  { name: "Özlük Dosyası", href: "/ik/ozluk", icon: FolderOpen },
+  { name: "Disiplin", href: "/ik/disiplin", icon: Scale },
+  { name: "Performans", href: "/ik/performans", icon: TrendingUp },
+];
+
+/* ─────── İSG Navigasyonu ─────── */
+const isgNavigation = [
+  { name: "İSG Özet", href: "/isg", icon: Shield },
+  { name: "Eğitimler", href: "/isg/egitimler", icon: GraduationCap },
+  { name: "Sertifikalar", href: "/isg/sertifikalar", icon: Award },
+  { name: "Periyodik Muayene", href: "/isg/muayeneler", icon: Stethoscope },
+  { name: "KKD Takibi", href: "/isg/kkd", icon: HelmetIcon },
+  { name: "İş Kazaları", href: "/isg/kazalar", icon: Siren },
+];
+
 const adminNavigation = [
   { name: "Ayarlar", href: "/ayarlar", icon: Settings },
 ];
@@ -58,6 +92,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [brand, setBrand] = useState<string | null>(null);
+
+  // Hangi modüldeyiz?
+  const isIK = pathname.startsWith("/ik");
+  const isISG = pathname.startsWith("/isg");
+  const isProject = !isIK && !isISG;
+
+  // Aktif modülün navigasyonu
+  const activeNav = isIK ? ikNavigation : isISG ? isgNavigation : projectNavigation;
+  const moduleTitle = isIK ? "İnsan Kaynakları" : isISG ? "İş Sağlığı & Güvenliği" : "Proje Yönetimi";
+  const ModuleIcon = isIK ? UserCheck : isISG ? Shield : FolderKanban;
+  const moduleColor = isIK ? "text-cyan-600" : isISG ? "text-red-600" : "text-blue-600";
 
   useEffect(() => {
     const saved = localStorage.getItem("theme-brand");
@@ -128,27 +173,39 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <Separator className="mx-3 my-1" />
 
-      {/* Navigasyon */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
-        {navigation.map((item) => {
-          const isActive = pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              )}
-            >
-              <item.icon className="h-5 w-5" />
-              {item.name}
-            </Link>
-          );
-        })}
+      {/* Navigasyon — sadece aktif modül */}
+      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+        {/* Modül Başlığı */}
+        <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <ModuleIcon className={cn("h-3.5 w-3.5", moduleColor)} />
+          <span>{moduleTitle}</span>
+        </div>
+
+        {/* Modül menü öğeleri */}
+        <div className="space-y-0.5">
+          {activeNav.map((item) => {
+            const baseHref = isIK ? "/ik" : isISG ? "/isg" : "";
+            const isActive = baseHref
+              ? (pathname === item.href || (item.href !== baseHref && pathname.startsWith(item.href)))
+              : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={onNavigate}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.name}
+              </Link>
+            );
+          })}
+        </div>
 
         {/* Admin bölümü */}
         {session?.user?.role === "ADMIN" && (

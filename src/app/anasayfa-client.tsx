@@ -166,11 +166,20 @@ const classicModules: ClassicModule[] = [
   {
     name: "İnsan Kaynakları",
     icon: UserCheck,
-    href: "#",
+    href: "/ik",
     color: "bg-cyan-600",
     description: "Personel ve özlük yönetimi",
-    features: ["Personel özlük", "Puantaj", "İzin", "Eğitim", "Sertifika", "Performans", "Bordro veri çıktısı"],
-    status: "soon",
+    features: ["Personel", "Departmanlar", "Pozisyonlar", "İzin Yönetimi", "Özlük Dosyası", "Disiplin", "Performans"],
+    status: "active",
+  },
+  {
+    name: "İş Sağlığı & Güvenliği",
+    icon: Shield,
+    href: "/isg",
+    color: "bg-red-600",
+    description: "İSG eğitim, muayene ve KKD takibi",
+    features: ["Eğitimler", "Sertifikalar", "Periyodik Muayene", "KKD Takibi", "İş Kazaları", "Uyarı Paneli"],
+    status: "active",
   },
   {
     name: "Yatırım & GYO",
