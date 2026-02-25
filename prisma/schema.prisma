@@ -1001,3 +1001,23 @@ enum AccidentStatus {
   INVESTIGATING
   CLOSED_ACCIDENT
 }
+
+// ─── ANA FİRMA PROFİLİ (singleton) ──────────────────────
+model CompanyProfile {
+  id            String   @id @default(cuid())
+  name          String
+  taxNo         String?  @map("tax_no")
+  taxOffice     String?  @map("tax_office")
+  address       String?
+  phone         String?
+  email         String?
+  website       String?
+  sector        String?
+  foundedYear   Int?     @map("founded_year")
+  logoUrl       String?  @map("logo_url")
+  description   String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("company_profile")
+}

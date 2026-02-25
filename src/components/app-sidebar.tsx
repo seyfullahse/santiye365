@@ -35,6 +35,7 @@ import {
   Stethoscope,
   HardHat as HelmetIcon,
   Siren,
+  Network,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -83,6 +84,13 @@ const isgNavigation = [
   { name: "İş Kazaları", href: "/isg/kazalar", icon: Siren },
 ];
 
+/* ─────── Organizasyon Navigasyonu ─────── */
+const orgNavigation = [
+  { name: "Org. Şeması", href: "/organizasyon", icon: Network },
+  { name: "Firma Profili", href: "/organizasyon/profil", icon: Building2 },
+  { name: "İletişim Dizini", href: "/organizasyon/iletisim", icon: Users },
+];
+
 const adminNavigation = [
   { name: "Ayarlar", href: "/ayarlar", icon: Settings },
 ];
@@ -96,13 +104,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   // Hangi modüldeyiz?
   const isIK = pathname.startsWith("/ik");
   const isISG = pathname.startsWith("/isg");
-  const isProject = !isIK && !isISG;
+  const isOrg = pathname.startsWith("/organizasyon");
+  const isProject = !isIK && !isISG && !isOrg;
 
   // Aktif modülün navigasyonu
-  const activeNav = isIK ? ikNavigation : isISG ? isgNavigation : projectNavigation;
-  const moduleTitle = isIK ? "İnsan Kaynakları" : isISG ? "İş Sağlığı & Güvenliği" : "Proje Yönetimi";
-  const ModuleIcon = isIK ? UserCheck : isISG ? Shield : FolderKanban;
-  const moduleColor = isIK ? "text-cyan-600" : isISG ? "text-red-600" : "text-blue-600";
+  const activeNav = isOrg ? orgNavigation : isIK ? ikNavigation : isISG ? isgNavigation : projectNavigation;
+  const moduleTitle = isOrg ? "Organizasyon" : isIK ? "İnsan Kaynakları" : isISG ? "İş Sağlığı & Güvenliği" : "Proje Yönetimi";
+  const ModuleIcon = isOrg ? Network : isIK ? UserCheck : isISG ? Shield : FolderKanban;
+  const moduleColor = isOrg ? "text-violet-600" : isIK ? "text-cyan-600" : isISG ? "text-red-600" : "text-blue-600";
 
   useEffect(() => {
     const saved = localStorage.getItem("theme-brand");
@@ -184,7 +193,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         {/* Modül menü öğeleri */}
         <div className="space-y-0.5">
           {activeNav.map((item) => {
-            const baseHref = isIK ? "/ik" : isISG ? "/isg" : "";
+            const baseHref = isOrg ? "/organizasyon" : isIK ? "/ik" : isISG ? "/isg" : "";
             const isActive = baseHref
               ? (pathname === item.href || (item.href !== baseHref && pathname.startsWith(item.href)))
               : pathname.startsWith(item.href);

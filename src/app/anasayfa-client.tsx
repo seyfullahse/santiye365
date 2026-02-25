@@ -41,6 +41,7 @@ import {
   TrendingUp,
   MessageSquare,
   FolderOpen,
+  Network,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -179,6 +180,15 @@ const classicModules: ClassicModule[] = [
     color: "bg-red-600",
     description: "İSG eğitim, muayene ve KKD takibi",
     features: ["Eğitimler", "Sertifikalar", "Periyodik Muayene", "KKD Takibi", "İş Kazaları", "Uyarı Paneli"],
+    status: "active",
+  },
+  {
+    name: "Organizasyon",
+    icon: Network,
+    href: "/organizasyon",
+    color: "bg-violet-600",
+    description: "Organizasyon şeması ve firma profili",
+    features: ["Org. Şeması", "Firma Profili", "İletişim Dizini", "Yönetim Zinciri", "Departman İstatistikleri"],
     status: "active",
   },
   {
