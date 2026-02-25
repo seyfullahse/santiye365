@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download, Upload, FileDown } from "lucide-react";
+import { toast } from "sonner";
 
 interface Employee {
   id: string;
@@ -79,6 +80,9 @@ export default function PersonelPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [form, setForm] = useState(emptyForm);
+
+  const [importing, setImporting] = useState(false);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   // Dropdown data
   const [departments, setDepartments] = useState<SelectOption[]>([]);
@@ -165,16 +169,234 @@ export default function PersonelPage() {
   };
 
   const exportCSV = () => {
-    const headers = ["Sicil No", "Ad", "Soyad", "TC", "Telefon", "E-posta", "Departman", "Pozisyon", "Durum", "İşe Giriş"];
+    const headers = [
+      "Ad", "Soyad", "TC Kimlik No", "Sicil No", "Telefon", "E-posta",
+      "Departman", "Pozisyon", "Şirket", "Proje", "Ekip",
+      "Cinsiyet", "Medeni Durum", "Kan Grubu", "Doğum Tarihi", "Doğum Yeri",
+      "Adres", "SGK No", "SGK Giriş Tarihi", "İşe Giriş Tarihi",
+      "Maaş", "Maaş Türü", "Durum",
+      "Acil Durum Kişisi", "Acil Durum Telefonu", "Yakınlık Derecesi",
+    ];
     const rows = employees.map((e) => [
-      e.employeeNo || "", e.firstName, e.lastName, e.tcNo || "", e.phone || "", e.email || "",
-      e.department?.name || "", e.position?.name || "", statusMap[e.status]?.label || e.status,
+      e.firstName, e.lastName, e.tcNo || "", e.employeeNo || "", e.phone || "", e.email || "",
+      e.department?.name || "", e.position?.name || "", e.company?.name || "",
+      e.project?.name || "", e.team?.name || "",
+      genderMap[e.gender || ""] || "", maritalMap[e.maritalStatus || ""] || "",
+      bloodMap[e.bloodType || ""] || "",
+      e.birthDate ? new Date(e.birthDate).toLocaleDateString("tr-TR") : "",
+      e.birthPlace || "", e.address || "", e.sgkNo || "",
+      e.sgkStartDate ? new Date(e.sgkStartDate).toLocaleDateString("tr-TR") : "",
       e.hireDate ? new Date(e.hireDate).toLocaleDateString("tr-TR") : "",
+      e.salary?.toString() || "", salaryTypeMap[e.salaryType || ""] || "",
+      statusMap[e.status]?.label || e.status,
+      e.emergencyName || "", e.emergencyPhone || "", e.emergencyRelation || "",
     ]);
-    const csv = [headers, ...rows].map((r) => r.join(";")).join("\n");
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(";")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "personel.csv"; a.click();
+  };
+
+  const downloadCSVTemplate = () => {
+    const headers = [
+      "Ad", "Soyad", "TC Kimlik No", "Sicil No", "Telefon", "E-posta",
+      "Departman", "Pozisyon", "Şirket", "Proje", "Ekip",
+      "Cinsiyet", "Medeni Durum", "Kan Grubu", "Doğum Tarihi", "Doğum Yeri",
+      "Adres", "SGK No", "SGK Giriş Tarihi", "İşe Giriş Tarihi",
+      "Maaş", "Maaş Türü", "Durum",
+      "Acil Durum Kişisi", "Acil Durum Telefonu", "Yakınlık Derecesi",
+    ];
+    const example = [
+      "Ahmet", "Yılmaz", "12345678901", "S001", "05551234567", "ahmet@firma.com",
+      "Şantiye/Saha", "Şantiye Şefi", "ABC İnşaat", "", "",
+      "Erkek", "Evli", "A+", "15.03.1985", "İstanbul",
+      "Kadıköy, İstanbul", "1234567890", "01.01.2024", "01.01.2024",
+      "25000", "Aylık", "Aktif",
+      "Ayşe Yılmaz", "05559876543", "Eş",
+    ];
+    const csv = [headers, example].map((r) => r.map((c) => `"${c}"`).join(";")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "personel-sablonu.csv"; a.click();
+  };
+
+  const reverseGender: Record<string, string> = { "Erkek": "MALE", "Kadın": "FEMALE" };
+  const reverseMarital: Record<string, string> = { "Bekar": "SINGLE", "Evli": "MARRIED", "Boşanmış": "DIVORCED", "Dul": "WIDOWED" };
+  const reverseBlood: Record<string, string> = { "A+": "A_POS", "A-": "A_NEG", "B+": "B_POS", "B-": "B_NEG", "AB+": "AB_POS", "AB-": "AB_NEG", "0+": "O_POS", "0-": "O_NEG" };
+  const reverseStatus: Record<string, string> = { "Aktif": "ACTIVE", "Pasif": "PASSIVE", "İzinli": "ON_LEAVE", "Uzaklaştırılmış": "SUSPENDED" };
+  const reverseSalaryType: Record<string, string> = { "Aylık": "MONTHLY", "Günlük": "DAILY", "Saatlik": "HOURLY" };
+
+  const parseTRDate = (val: string): string | null => {
+    if (!val) return null;
+    // dd.MM.yyyy or dd/MM/yyyy
+    const m = val.match(/(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+    if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    // yyyy-MM-dd already
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    return null;
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setImporting(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      if (lines.length < 2) { toast.error("CSV dosyası boş veya yalnızca başlık satırı içeriyor"); setImporting(false); return; }
+
+      // Parse header
+      const headerLine = lines[0];
+      const headers = headerLine.split(";").map((h) => h.replace(/^"|"$/g, "").trim());
+
+      // Fetch fresh lookup data
+      const [deptRes, compRes, projRes, teamRes, posRes] = await Promise.all([
+        fetch("/api/ik/departmanlar"), fetch("/api/sirketler"),
+        fetch("/api/projeler"), fetch("/api/ekipler"), fetch("/api/ik/pozisyonlar"),
+      ]);
+      const [deptList, compList, projList, teamList, posList] = await Promise.all([
+        deptRes.json(), compRes.json(), projRes.json(), teamRes.json(), posRes.json(),
+      ]);
+      const depts: SelectOption[] = Array.isArray(deptList) ? deptList : [];
+      const comps: SelectOption[] = Array.isArray(compList) ? compList : [];
+      const projs: SelectOption[] = Array.isArray(projList) ? projList : [];
+      const tms: SelectOption[] = Array.isArray(teamList) ? teamList : [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const poss: (SelectOption & { departmentId?: string })[] = Array.isArray(posList) ? posList : [];
+
+      const findId = (list: SelectOption[], name: string) => {
+        if (!name) return null;
+        const n = name.toLowerCase().trim();
+        return list.find((i) => i.name.toLowerCase().trim() === n)?.id || null;
+      };
+
+      const colIdx = (names: string[]) => {
+        for (const n of names) {
+          const idx = headers.findIndex((h) => h.toLowerCase() === n.toLowerCase());
+          if (idx >= 0) return idx;
+        }
+        return -1;
+      };
+
+      // Column indexes
+      const iAd = colIdx(["Ad", "ad", "firstName"]);
+      const iSoyad = colIdx(["Soyad", "soyad", "lastName"]);
+      const iTc = colIdx(["TC Kimlik No", "TC", "tcNo"]);
+      const iSicil = colIdx(["Sicil No", "sicilNo", "employeeNo"]);
+      const iTel = colIdx(["Telefon", "telefon", "phone"]);
+      const iEmail = colIdx(["E-posta", "email", "Email"]);
+      const iDept = colIdx(["Departman", "departman", "department"]);
+      const iPos = colIdx(["Pozisyon", "pozisyon", "position"]);
+      const iComp = colIdx(["Şirket", "şirket", "sirket", "company"]);
+      const iProj = colIdx(["Proje", "proje", "project"]);
+      const iTeam = colIdx(["Ekip", "ekip", "team"]);
+      const iGender = colIdx(["Cinsiyet", "cinsiyet", "gender"]);
+      const iMarital = colIdx(["Medeni Durum", "medeniDurum"]);
+      const iBlood = colIdx(["Kan Grubu", "kanGrubu"]);
+      const iBirth = colIdx(["Doğum Tarihi", "dogumTarihi"]);
+      const iBirthPlace = colIdx(["Doğum Yeri", "dogumYeri"]);
+      const iAddr = colIdx(["Adres", "adres", "address"]);
+      const iSgk = colIdx(["SGK No", "sgkNo"]);
+      const iSgkDate = colIdx(["SGK Giriş Tarihi", "sgkGirisTarihi"]);
+      const iHire = colIdx(["İşe Giriş Tarihi", "İşe Giriş", "iseGirisTarihi"]);
+      const iSalary = colIdx(["Maaş", "maas", "salary"]);
+      const iSalaryType = colIdx(["Maaş Türü", "maasTuru", "salaryType"]);
+      const iStatus = colIdx(["Durum", "durum", "status"]);
+      const iEmName = colIdx(["Acil Durum Kişisi", "acilDurumKisisi"]);
+      const iEmPhone = colIdx(["Acil Durum Telefonu", "acilDurumTelefonu"]);
+      const iEmRel = colIdx(["Yakınlık Derecesi", "yakinlikDerecesi"]);
+
+      if (iAd < 0 || iSoyad < 0) {
+        toast.error("CSV'de 'Ad' ve 'Soyad' sütunları zorunludur");
+        setImporting(false);
+        return;
+      }
+
+      const parseCell = (row: string[], idx: number) => idx >= 0 && idx < row.length ? row[idx].replace(/^"|"$/g, "").trim() : "";
+
+      let success = 0, failed = 0, skipped = 0;
+      const errors: string[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const cells = lines[i].split(";");
+        const ad = parseCell(cells, iAd);
+        const soyad = parseCell(cells, iSoyad);
+        if (!ad || !soyad) { skipped++; continue; }
+
+        const deptName = parseCell(cells, iDept);
+        const posName = parseCell(cells, iPos);
+        const compName = parseCell(cells, iComp);
+        const projName = parseCell(cells, iProj);
+        const teamName = parseCell(cells, iTeam);
+
+        const departmentId = findId(depts, deptName);
+        const companyId = findId(comps, compName);
+        const projectId = findId(projs, projName);
+        const teamId = findId(tms, teamName);
+
+        // Match position by name + department
+        let positionId: string | null = null;
+        if (posName) {
+          const pn = posName.toLowerCase().trim();
+          const match = poss.find((p) => p.name.toLowerCase().trim() === pn && (!departmentId || p.departmentId === departmentId));
+          positionId = match?.id || poss.find((p) => p.name.toLowerCase().trim() === pn)?.id || null;
+        }
+
+        const genderVal = parseCell(cells, iGender);
+        const maritalVal = parseCell(cells, iMarital);
+        const bloodVal = parseCell(cells, iBlood);
+        const statusVal = parseCell(cells, iStatus);
+        const salaryTypeVal = parseCell(cells, iSalaryType);
+        const salaryVal = parseCell(cells, iSalary);
+
+        const body = {
+          firstName: ad,
+          lastName: soyad,
+          tcNo: parseCell(cells, iTc) || null,
+          employeeNo: parseCell(cells, iSicil) || null,
+          phone: parseCell(cells, iTel) || null,
+          email: parseCell(cells, iEmail) || null,
+          departmentId, positionId, companyId, projectId, teamId,
+          gender: reverseGender[genderVal] || (genderVal.toUpperCase() === "MALE" || genderVal.toUpperCase() === "FEMALE" ? genderVal.toUpperCase() : null),
+          maritalStatus: reverseMarital[maritalVal] || null,
+          bloodType: reverseBlood[bloodVal] || null,
+          birthDate: parseTRDate(parseCell(cells, iBirth)),
+          birthPlace: parseCell(cells, iBirthPlace) || null,
+          address: parseCell(cells, iAddr) || null,
+          sgkNo: parseCell(cells, iSgk) || null,
+          sgkStartDate: parseTRDate(parseCell(cells, iSgkDate)),
+          hireDate: parseTRDate(parseCell(cells, iHire)),
+          salary: salaryVal ? salaryVal.replace(/[^\d.,]/g, "").replace(",", ".") : null,
+          salaryType: reverseSalaryType[salaryTypeVal] || (salaryTypeVal.toUpperCase() === "MONTHLY" || salaryTypeVal.toUpperCase() === "DAILY" || salaryTypeVal.toUpperCase() === "HOURLY" ? salaryTypeVal.toUpperCase() : null),
+          status: reverseStatus[statusVal] || (["ACTIVE", "PASSIVE", "ON_LEAVE", "SUSPENDED"].includes(statusVal.toUpperCase()) ? statusVal.toUpperCase() : "ACTIVE"),
+          emergencyName: parseCell(cells, iEmName) || null,
+          emergencyPhone: parseCell(cells, iEmPhone) || null,
+          emergencyRelation: parseCell(cells, iEmRel) || null,
+        };
+
+        try {
+          const res = await fetch("/api/ik/personel", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+          });
+          if (res.ok) { success++; } else { failed++; errors.push(`Satır ${i + 1}: ${ad} ${soyad} - API hatası`); }
+        } catch {
+          failed++;
+          errors.push(`Satır ${i + 1}: ${ad} ${soyad} - Bağlantı hatası`);
+        }
+      }
+
+      if (success > 0) toast.success(`${success} personel başarıyla eklendi`);
+      if (skipped > 0) toast.warning(`${skipped} satır atlandı (ad/soyad boş)`);
+      if (failed > 0) toast.error(`${failed} satır eklenemedi: ${errors.slice(0, 3).join(", ")}`);
+      fetchEmployees();
+    } catch (err) {
+      console.error("CSV import error:", err);
+      toast.error("CSV dosyası okunamadı");
+    } finally {
+      setImporting(false);
+    }
   };
 
   const setField = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
@@ -186,10 +408,17 @@ export default function PersonelPage() {
           <h1 className="text-2xl font-bold">Personel Yönetimi</h1>
           <p className="text-muted-foreground">{total} personel kayıtlı</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportCSV}>
-            <Download className="h-4 w-4 mr-2" />CSV
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={downloadCSVTemplate}>
+            <FileDown className="h-4 w-4 mr-2" />Şablon İndir
           </Button>
+          <Button variant="outline" size="sm" onClick={() => csvInputRef.current?.click()} disabled={importing}>
+            <Upload className="h-4 w-4 mr-2" />{importing ? "İçe aktarılıyor..." : "CSV İçe Aktar"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-4 w-4 mr-2" />CSV Dışa Aktar
+          </Button>
+          <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Yeni Personel</Button>
