@@ -46,7 +46,6 @@ import {
   Megaphone,
   Tag,
   PlusCircle,
-  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -66,7 +65,6 @@ function extractProjectId(pathname: string): string | null {
 /* ─────── Proje Yönetimi Navigasyonu (Proje seçim öncesi) ─────── */
 const projectNavigation = [
   { name: "Projeler", href: "/projeler", icon: FolderKanban },
-  { name: "Geri Sayım", href: "/sayac", icon: Timer },
   { name: "Mahaller", href: "/mahaller", icon: MapPin },
   { name: "Katlar", href: "/katlar", icon: Layers },
   { name: "Aktiviteler", href: "/aktiviteler", icon: Activity },

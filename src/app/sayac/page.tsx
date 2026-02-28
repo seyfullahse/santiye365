@@ -16,6 +16,8 @@ import {
   Target,
   X,
   Check,
+  ArrowLeft,
+  Home,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -436,6 +438,15 @@ export default function SayacPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
+      {/* Geri Dön */}
+      <div className="flex items-center gap-2">
+        <a href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-4 w-4" />
+          <Home className="h-4 w-4" />
+          Ana Sayfa
+        </a>
+      </div>
+
       {/* Üst Başlık */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
