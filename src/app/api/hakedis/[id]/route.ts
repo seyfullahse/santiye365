@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// GET — Tek hakediş detay
+// GET — Tek hakediş detay (eski endpoint — özet sayfası uyumluluğu için korundu)
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,7 +13,6 @@ export async function GET(
       include: {
         project: { select: { id: true, name: true } },
         company: { select: { id: true, name: true } },
-        items: { orderBy: { pozNo: "asc" } },
       },
     });
 
@@ -28,7 +27,7 @@ export async function GET(
   }
 }
 
-// PUT — Hakediş güncelle
+// PUT — Hakediş durum/bilgi güncelle (status, period, notes)
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -36,77 +35,12 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await req.json();
-    const {
-      period,
-      startDate,
-      endDate,
-      notes,
-      status,
-      items,
-      advanceDeduction,
-      retentionRate,
-      stampTax,
-      otherDeduction,
-    } = body;
+    const { period, startDate, endDate, notes, status } = body;
 
-    // Mevcut hakedişi al
-    const existing = await prisma.hakedis.findUnique({
-      where: { id },
-      include: { items: true },
-    });
-
+    const existing = await prisma.hakedis.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "Hakediş bulunamadı" }, { status: 404 });
     }
-
-    // Eğer items gönderildiyse güncelle
-    let currentAmount = existing.currentAmount;
-    let totalAmount = existing.totalAmount;
-
-    if (items) {
-      // Mevcut kalemleri sil
-      await prisma.hakedisItem.deleteMany({ where: { hakedisId: id } });
-
-      const processedItems = items.map((item: {
-        pozNo: string;
-        description: string;
-        unit: string;
-        contractQty: number;
-        unitPrice: number;
-        previousQty: number;
-        currentQty: number;
-      }) => {
-        const cumulativeQty = (item.previousQty || 0) + (item.currentQty || 0);
-        const amount = (item.currentQty || 0) * (item.unitPrice || 0);
-        return {
-          hakedisId: id,
-          pozNo: item.pozNo,
-          description: item.description,
-          unit: item.unit,
-          contractQty: item.contractQty || 0,
-          unitPrice: item.unitPrice || 0,
-          previousQty: item.previousQty || 0,
-          currentQty: item.currentQty || 0,
-          cumulativeQty,
-          amount,
-        };
-      });
-
-      await prisma.hakedisItem.createMany({ data: processedItems });
-
-      currentAmount = processedItems.reduce(
-        (sum: number, i: { amount: number }) => sum + i.amount,
-        0
-      );
-      totalAmount = existing.previousAmount + currentAmount;
-    }
-
-    const rate = retentionRate ?? existing.retentionRate;
-    const retentionAmount = totalAmount * (rate / 100);
-    const advance = advanceDeduction ?? existing.advanceDeduction;
-    const stamp = stampTax ?? existing.stampTax;
-    const other = otherDeduction ?? existing.otherDeduction;
-    const netAmount = currentAmount - advance - retentionAmount - stamp - other;
 
     const updated = await prisma.hakedis.update({
       where: { id },
@@ -116,19 +50,10 @@ export async function PUT(
         ...(endDate && { endDate: new Date(endDate) }),
         ...(notes !== undefined && { notes }),
         ...(status && { status }),
-        currentAmount,
-        totalAmount,
-        advanceDeduction: advance,
-        retentionRate: rate,
-        retentionAmount,
-        stampTax: stamp,
-        otherDeduction: other,
-        netAmount,
       },
       include: {
         project: { select: { id: true, name: true } },
         company: { select: { id: true, name: true } },
-        items: { orderBy: { pozNo: "asc" } },
       },
     });
 

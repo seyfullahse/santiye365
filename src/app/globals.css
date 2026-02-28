@@ -127,6 +127,110 @@
   }
 }
 
+/* ============ Organizasyon Ağaç Şeması ============ */
+.org-tree-chart {
+  --tree-line: #cbd5e1;
+}
+
+.dark .org-tree-chart {
+  --tree-line: #475569;
+}
+
+.org-tree-chart ul {
+  display: flex;
+  justify-content: center;
+  padding-top: 1.75rem;
+  position: relative;
+  list-style: none;
+  margin: 0;
+}
+
+.org-tree-chart > ul {
+  padding-top: 0;
+}
+
+.org-tree-chart li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 1.75rem 0.375rem 0;
+}
+
+.org-tree-chart > ul > li {
+  padding-top: 0;
+}
+
+/* Dikey bağlantı: ebeveynden çocuklara */
+.org-tree-chart ul ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 1.75rem;
+  background: var(--tree-line);
+  transform: translateX(-50%);
+}
+
+/* Yatay çizgi: sol taraf */
+.org-tree-chart li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 1.75rem;
+  border-top: 2px solid var(--tree-line);
+}
+
+/* Yatay çizgi: sağ taraf + dikey iniş */
+.org-tree-chart li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 50%;
+  height: 1.75rem;
+  border-left: 2px solid var(--tree-line);
+  border-top: 2px solid var(--tree-line);
+}
+
+/* İlk çocuk: sol yatay çizgi yok */
+.org-tree-chart li:first-child::before {
+  border: none;
+}
+
+.org-tree-chart li:first-child::after {
+  border-top-left-radius: 8px;
+}
+
+/* Son çocuk: sağ yatay çizgi yok */
+.org-tree-chart li:last-child::after {
+  border-top: none;
+}
+
+.org-tree-chart li:last-child::before {
+  border-right: 2px solid var(--tree-line);
+  border-top-right-radius: 8px;
+}
+
+/* Tek çocuk: yatay çizgi yok */
+.org-tree-chart li:only-child::before,
+.org-tree-chart li:only-child::after {
+  display: none;
+}
+
+.org-tree-chart li:only-child {
+  padding-top: 0;
+}
+
+/* Kök düzeyi: bağlantı çizgileri yok */
+.org-tree-chart > ul > li::before,
+.org-tree-chart > ul > li::after {
+  display: none;
+}
+
 /* Yazdırma düzeni: sidebar ve butonları gizle, arka planı beyaz yap */
 @media print {
   body {

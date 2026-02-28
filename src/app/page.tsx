@@ -14,7 +14,7 @@ export default async function HomePage() {
   const [activeProjects, totalWorkers, pendingApprovals, todayAttendance, recentActivities] =
     await Promise.all([
       prisma.project.count({ where: { status: "ACTIVE" } }),
-      prisma.worker.count(),
+      prisma.employee.count({ where: { status: "ACTIVE" } }),
       prisma.approval.count({ where: { status: "WAITING" } }),
       prisma.attendance.count({
         where: {

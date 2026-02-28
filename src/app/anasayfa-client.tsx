@@ -42,6 +42,8 @@ import {
   MessageSquare,
   FolderOpen,
   Network,
+  Receipt,
+  Megaphone,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -192,6 +194,15 @@ const classicModules: ClassicModule[] = [
     status: "active",
   },
   {
+    name: "Hakediş Yönetimi",
+    icon: Receipt,
+    href: "/hakedis",
+    color: "bg-amber-600",
+    description: "İşveren ve taşeron hakediş takibi",
+    features: ["İşveren Hakedişi", "Taşeron Hakedişi", "Sözleşmeler", "Keşif Yükleme", "İş Kalemleri", "Kesintiler", "Hakediş Özet"],
+    status: "active",
+  },
+  {
     name: "Yatırım & GYO",
     icon: TrendingUp,
     href: "#",
@@ -203,11 +214,20 @@ const classicModules: ClassicModule[] = [
   {
     name: "CRM & Müşteri",
     icon: MessageSquare,
-    href: "#",
+    href: "/crm",
     color: "bg-pink-500",
     description: "Müşteri ilişkileri yönetimi",
-    features: ["Müşteri kartı", "Fırsat kaydı", "Teklif takip", "İletişim geçmişi", "Satış pipeline", "Sözleşme bağlantısı"],
-    status: "soon",
+    features: ["Müşteri kartı", "Fırsat kaydı", "Pipeline", "İletişim geçmişi", "Kişi yönetimi", "Takip hatırlatma"],
+    status: "active",
+  },
+  {
+    name: "Duyurular",
+    icon: Megaphone,
+    href: "/duyurular",
+    color: "bg-sky-500",
+    description: "Şirket duyuru ve bildirim yönetimi",
+    features: ["Duyuru oluşturma", "Kategori yönetimi", "Öncelik seviyeleri", "Hedef kitle", "Okunma takibi", "Sabitleme", "Zamanlama"],
+    status: "active",
   },
   {
     name: "Doküman Yönetimi",
@@ -331,6 +351,83 @@ function statusLabel(s: string) {
   return map[s] || { label: s, variant: "secondary" as const };
 }
 
+/* ───── Duyuru Widget (Anasayfa) ───── */
+function AnnouncementWidget() {
+  const [announcements, setAnnouncements] = useState<{
+    id: string;
+    title: string;
+    content: string;
+    priority: string;
+    isPinned: boolean;
+    publishDate: string;
+    category: { name: string; color: string };
+  }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/duyurular?limit=5")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.announcements) setAnnouncements(data.announcements);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="p-4 text-center text-sm text-muted-foreground">
+        Yükleniyor...
+      </div>
+    );
+  }
+
+  if (announcements.length === 0) {
+    return (
+      <div className="p-4 text-center text-sm text-muted-foreground">
+        <Megaphone className="h-8 w-8 mx-auto mb-2 opacity-30" />
+        Henüz duyuru yok
+      </div>
+    );
+  }
+
+  const priorityDot: Record<string, string> = {
+    NORMAL: "bg-blue-500",
+    IMPORTANT: "bg-orange-500",
+    URGENT: "bg-red-500",
+  };
+
+  return (
+    <div className="divide-y">
+      {announcements.map((ann) => (
+        <Link key={ann.id} href="/duyurular" className="block p-3 hover:bg-muted/40 transition-colors">
+          <div className="flex items-start gap-2">
+            <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${priorityDot[ann.priority] || "bg-blue-500"}`} />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                {ann.isPinned && <span className="text-[10px]">📌</span>}
+                <p className="text-xs font-semibold leading-tight truncate">{ann.title}</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug line-clamp-1">{ann.content}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span
+                  className="text-[9px] px-1 py-0 rounded border"
+                  style={{ borderColor: ann.category.color, color: ann.category.color }}
+                >
+                  {ann.category.name}
+                </span>
+                <p className="text-[10px] text-muted-foreground/60">
+                  {new Date(ann.publishDate).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function ClassicView({ userName, userEmail, kpiData, recentActivities }: AnasayfaProps) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
@@ -428,33 +525,18 @@ function ClassicView({ userName, userEmail, kpiData, recentActivities }: Anasayf
 
           {/* Duyurular */}
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Bell className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Duyurular</h2>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">Duyurular</h2>
+              </div>
+              <Link href="/duyurular" className="text-xs text-primary hover:underline flex items-center gap-1">
+                Tümünü Gör <ChevronRight className="h-3 w-3" />
+              </Link>
             </div>
             <Card className="h-[calc(100%-2.25rem)]">
               <CardContent className="p-0">
-                <div className="divide-y">
-                  {[
-                    { title: "Şantiye360 v2.0 Yayında!", desc: "Yeni modüller ve AI destekli analizler aktif edildi.", date: "23 Şub 2026", type: "update" as const },
-                    { title: "Hakediş Modülü Aktif", desc: "İşveren ve taşeron hakediş takibi artık kullanılabilir.", date: "22 Şub 2026", type: "feature" as const },
-                    { title: "Puantaj Sistemi Güncellendi", desc: "Günlük devam takibi ve raporlama iyileştirildi.", date: "20 Şub 2026", type: "update" as const },
-                    { title: "Yakında: Finans & Bütçe", desc: "Mali takip ve bütçe yönetimi modülü geliştiriliyor.", date: "18 Şub 2026", type: "soon" as const },
-                  ].map((ann, i) => (
-                    <div key={i} className="p-3 hover:bg-muted/40 transition-colors">
-                      <div className="flex items-start gap-2">
-                        <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
-                          ann.type === "update" ? "bg-blue-500" : ann.type === "feature" ? "bg-emerald-500" : "bg-amber-500"
-                        }`} />
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold leading-tight">{ann.title}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{ann.desc}</p>
-                          <p className="text-[10px] text-muted-foreground/60 mt-1">{ann.date}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <AnnouncementWidget />
               </CardContent>
             </Card>
           </div>

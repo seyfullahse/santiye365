@@ -61,6 +61,8 @@ const deptColors = [
   "bg-pink-100 border-pink-300 text-pink-800",
 ];
 
+
+
 function OrgNode({
   node,
   level,
@@ -194,6 +196,8 @@ export default function OrganizasyonPage() {
   // Assign colors per department
   const deptColorMap = new Map<string, string>();
   departments.forEach((d, i) => deptColorMap.set(d.id, deptColors[i % deptColors.length]));
+
+
 
   const totalEmp = departments.reduce((s, d) => s + d._count.employees, 0);
 

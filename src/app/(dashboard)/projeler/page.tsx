@@ -2,24 +2,29 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  FolderKanban,
+  MapPin,
+  Activity,
+  CalendarDays,
+  Building2,
+  ArrowRight,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
+  CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Project {
   id: string;
@@ -62,12 +68,21 @@ const statusColors: Record<string, "default" | "secondary" | "destructive" | "ou
   CANCELLED: "destructive",
 };
 
+const statusDotColors: Record<string, string> = {
+  ACTIVE: "bg-green-500",
+  COMPLETED: "bg-blue-500",
+  ON_HOLD: "bg-yellow-500",
+  CANCELLED: "bg-red-500",
+};
+
 export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -135,20 +150,38 @@ export default function ProjectsPage() {
     }
   }
 
+  // Filtreleme
+  const filteredProjects = projects.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.client?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+    const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const activeCount = projects.filter((p) => p.status === "ACTIVE").length;
+  const completedCount = projects.filter((p) => p.status === "COMPLETED").length;
+  const onHoldCount = projects.filter((p) => p.status === "ON_HOLD").length;
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6">
+      {/* Başlık */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Projeler</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Tüm inşaat projelerinizi yönetin
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+            <FolderKanban className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
+            Proje Yönetimi
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            Yönetmek istediğiniz projeyi seçin veya yeni bir proje oluşturun
           </p>
         </div>
         <Dialog
-          open={dialogOpen}
+          open={dialogOpen && !editProject}
           onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) setEditProject(null);
+            if (!editProject) {
+              setDialogOpen(open);
+            }
           }}
         >
           <DialogTrigger asChild>
@@ -159,62 +192,30 @@ export default function ProjectsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>
-                {editProject ? "Proje Düzenle" : "Yeni Proje"}
-              </DialogTitle>
+              <DialogTitle>Yeni Proje</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Proje Adı</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  defaultValue={editProject?.name ?? ""}
-                  required
-                />
+                <Input id="name" name="name" required placeholder="Örn: Merkez Residence" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="client">Müşteri</Label>
-                <Input
-                  id="client"
-                  name="client"
-                  defaultValue={editProject?.client ?? ""}
-                />
+                <Input id="client" name="client" placeholder="Örn: ABC İnşaat A.Ş." />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="startDate">Başlangıç Tarihi</Label>
-                  <Input
-                    id="startDate"
-                    name="startDate"
-                    type="date"
-                    defaultValue={
-                      editProject?.startDate
-                        ? editProject.startDate.split("T")[0]
-                        : ""
-                    }
-                  />
+                  <Input id="startDate" name="startDate" type="date" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="endDate">Bitiş Tarihi</Label>
-                  <Input
-                    id="endDate"
-                    name="endDate"
-                    type="date"
-                    defaultValue={
-                      editProject?.endDate
-                        ? editProject.endDate.split("T")[0]
-                        : ""
-                    }
-                  />
+                  <Input id="endDate" name="endDate" type="date" />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Durum</Label>
-                <Select
-                  name="status"
-                  defaultValue={editProject?.status ?? "ACTIVE"}
-                >
+                <Select name="status" defaultValue="ACTIVE">
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -227,118 +228,302 @@ export default function ProjectsPage() {
                 </Select>
               </div>
               <Button type="submit" className="w-full">
-                {editProject ? "Güncelle" : "Oluştur"}
+                <Plus className="mr-2 h-4 w-4" />
+                Proje Oluştur
               </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Proje Listesi</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-center text-muted-foreground py-8">
-              Yükleniyor...
-            </p>
-          ) : projects.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              Henüz proje bulunmuyor
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Proje Adı</TableHead>
-                  <TableHead>Müşteri</TableHead>
-                  <TableHead className="text-center">İlerleme</TableHead>
-                  <TableHead className="text-center">Mahal</TableHead>
-                  <TableHead className="text-center">Aktivite</TableHead>
-                  <TableHead>Durum</TableHead>
-                  <TableHead>Başlangıç</TableHead>
-                  <TableHead>Bitiş</TableHead>
-                  <TableHead className="text-right">İşlemler</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projects.map((project) => (
-                  <TableRow
-                    key={project.id}
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/dashboard?project=${project.id}`)}
-                  >
-                    <TableCell className="font-medium">
+      {/* Özet Kartları */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-muted-foreground">Toplam Proje</p>
+            <p className="text-xl sm:text-2xl font-bold">{projects.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-muted-foreground">Aktif</p>
+            <p className="text-xl sm:text-2xl font-bold text-green-600">{activeCount}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-blue-500">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-muted-foreground">Tamamlanan</p>
+            <p className="text-xl sm:text-2xl font-bold text-blue-600">{completedCount}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-yellow-500">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-muted-foreground">Beklemede</p>
+            <p className="text-xl sm:text-2xl font-bold text-yellow-600">{onHoldCount}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Arama ve Filtre */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Proje veya müşteri ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Durum Filtrele" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tüm Durumlar</SelectItem>
+              <SelectItem value="ACTIVE">Aktif</SelectItem>
+              <SelectItem value="COMPLETED">Tamamlandı</SelectItem>
+              <SelectItem value="ON_HOLD">Beklemede</SelectItem>
+              <SelectItem value="CANCELLED">İptal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Proje Kartları Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="p-6">
+              <Skeleton className="h-6 w-2/3 mb-3" />
+              <Skeleton className="h-4 w-1/2 mb-4" />
+              <Skeleton className="h-2 w-full mb-4" />
+              <div className="flex gap-4">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {/* Proje Kartları */}
+          {filteredProjects.map((project) => (
+            <Card
+              key={project.id}
+              className="group cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200 flex flex-col"
+              onClick={() => router.push(`/dashboard?project=${project.id}`)}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-lg truncate group-hover:text-primary transition-colors">
                       {project.name}
-                    </TableCell>
-                    <TableCell>{project.client ?? "-"}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-16 rounded-full bg-muted">
-                          <div
-                            className="h-2 rounded-full bg-primary"
-                            style={{
-                              width: `${Math.min(project.totalProgress, 100)}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="text-sm">%{project.totalProgress}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {project._count.zones}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {project._count.activities}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusColors[project.status]}>
-                        {statusLabels[project.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {project.startDate
-                        ? new Date(project.startDate).toLocaleDateString("tr-TR")
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {project.endDate
-                        ? new Date(project.endDate).toLocaleDateString("tr-TR")
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditProject(project);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(project.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                    </CardTitle>
+                    {project.client && (
+                      <CardDescription className="flex items-center gap-1.5 mt-1">
+                        <Building2 className="h-3.5 w-3.5" />
+                        {project.client}
+                      </CardDescription>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                    <div className={`h-2 w-2 rounded-full ${statusDotColors[project.status]}`} />
+                    <Badge variant={statusColors[project.status]} className="text-xs">
+                      {statusLabels[project.status]}
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="flex-1 pb-3 space-y-4">
+                {/* İlerleme Çubuğu */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">Genel İlerleme</span>
+                    <span className="text-sm font-bold">%{project.totalProgress}</span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-500"
+                      style={{ width: `${Math.min(project.totalProgress, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* İstatistikler */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4 text-blue-500" />
+                    <span><strong className="text-foreground">{project._count.zones}</strong> Mahal</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Activity className="h-4 w-4 text-orange-500" />
+                    <span><strong className="text-foreground">{project._count.activities}</strong> Aktivite</span>
+                  </div>
+                </div>
+
+                {/* Tarihler */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  <span>
+                    {project.startDate
+                      ? new Date(project.startDate).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })
+                      : "Başlangıç yok"}
+                    {" — "}
+                    {project.endDate
+                      ? new Date(project.endDate).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })
+                      : "Bitiş yok"}
+                  </span>
+                </div>
+              </CardContent>
+
+              <CardFooter className="pt-3 border-t flex items-center justify-between">
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditProject(project);
+                      setDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(project.id);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                  Projeye Git
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Sonuç bulunamadı */}
+      {!loading && filteredProjects.length === 0 && projects.length > 0 && (
+        <div className="text-center py-12">
+          <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+          <p className="text-lg font-medium text-muted-foreground">Sonuç bulunamadı</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Arama kriterlerinize uygun proje bulunamadı
+          </p>
+        </div>
+      )}
+
+      {/* Proje yoksa */}
+      {!loading && projects.length === 0 && (
+        <div className="text-center py-16">
+          <FolderKanban className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
+          <p className="text-xl font-semibold text-muted-foreground">Henüz proje bulunmuyor</p>
+          <p className="text-sm text-muted-foreground mt-2 mb-6">
+            İlk projenizi oluşturarak başlayın
+          </p>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            İlk Projenizi Oluşturun
+          </Button>
+        </div>
+      )}
+
+      {/* Düzenleme Dialog */}
+      <Dialog
+        open={dialogOpen && !!editProject}
+        onOpenChange={(open) => {
+          if (editProject) {
+            setDialogOpen(open);
+            if (!open) setEditProject(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Proje Düzenle</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Proje Adı</Label>
+              <Input
+                id="edit-name"
+                name="name"
+                defaultValue={editProject?.name ?? ""}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-client">Müşteri</Label>
+              <Input
+                id="edit-client"
+                name="client"
+                defaultValue={editProject?.client ?? ""}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-startDate">Başlangıç Tarihi</Label>
+                <Input
+                  id="edit-startDate"
+                  name="startDate"
+                  type="date"
+                  defaultValue={
+                    editProject?.startDate
+                      ? editProject.startDate.split("T")[0]
+                      : ""
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-endDate">Bitiş Tarihi</Label>
+                <Input
+                  id="edit-endDate"
+                  name="endDate"
+                  type="date"
+                  defaultValue={
+                    editProject?.endDate
+                      ? editProject.endDate.split("T")[0]
+                      : ""
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-status">Durum</Label>
+              <Select
+                name="status"
+                defaultValue={editProject?.status ?? "ACTIVE"}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Aktif</SelectItem>
+                  <SelectItem value="COMPLETED">Tamamlandı</SelectItem>
+                  <SelectItem value="ON_HOLD">Beklemede</SelectItem>
+                  <SelectItem value="CANCELLED">İptal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full">
+              Güncelle
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -24,7 +24,7 @@ Risk Skoru = impact × probability
 ## Kodlama Kuralları
 - Tüm UI metinleri Türkçe olmalıdır
 - API route'ları `/api/` altında Türkçe isimlendirme kullanır (projeler, mahaller, katlar, vb.)
-- Sayfa yolları Türkçe'dir (/projeler, /mahaller, /katlar, /aktiviteler, /onaylar, /riskler, /sirketler, /ekipler, /personel)
+- Sayfa yolları Türkçe'dir (/projeler, /mahaller, /katlar, /aktiviteler, /onaylar, /riskler, /sirketler, /ekipler, /personel, /crm, /crm/musteriler, /crm/firsatlar, /crm/iletisim, /duyurular)
 - shadcn/ui bileşenleri `@/components/ui/` altındadır
 - Prisma istemcisi `@/lib/prisma` üzerinden import edilir
 - Auth yapılandırması `@/lib/auth` üzerindedir

@@ -36,6 +36,17 @@ import {
   HardHat as HelmetIcon,
   Siren,
   Network,
+  GitBranch,
+  ArrowLeft,
+  Landmark,
+  Calculator,
+  FileSpreadsheet,
+  Upload,
+  Receipt,
+  Megaphone,
+  Tag,
+  PlusCircle,
+  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -44,23 +55,53 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
-/* ─────── Proje Yönetimi Navigasyonu ─────── */
+/* ─────── Yardımcı: Proje ID'sini pathname'den çıkar ─────── */
+function extractProjectId(pathname: string): string | null {
+  // /projeler/[id] veya /projeler/[id]/... formatını yakala
+  const match = pathname.match(/^\/projeler\/([^/]+)/);
+  if (match && match[1] !== "undefined") return match[1];
+  return null;
+}
+
+/* ─────── Proje Yönetimi Navigasyonu (Proje seçim öncesi) ─────── */
 const projectNavigation = [
-  { name: "Gösterge Paneli", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projeler", href: "/projeler", icon: FolderKanban },
+  { name: "Geri Sayım", href: "/sayac", icon: Timer },
   { name: "Mahaller", href: "/mahaller", icon: MapPin },
   { name: "Katlar", href: "/katlar", icon: Layers },
   { name: "Aktiviteler", href: "/aktiviteler", icon: Activity },
   { name: "Malzeme Takip", href: "/malzemeler", icon: Package },
   { name: "Onaylar", href: "/onaylar", icon: CheckCircle2 },
   { name: "Riskler", href: "/riskler", icon: AlertTriangle },
-  { name: "Hakediş", href: "/hakedis", icon: FileText },
   { name: "Şirketler", href: "/sirketler", icon: Building2 },
   { name: "Ekipler", href: "/ekipler", icon: Users },
   { name: "Çalışanlar", href: "/calisanlar", icon: UserCheck },
   { name: "Günlük Personel", href: "/personel", icon: HardHat },
   { name: "Puantaj", href: "/puantaj", icon: ClipboardList },
 ];
+
+/* ─────── Hakediş Navigasyonu ─────── */
+const hakedisNavigation = [
+  { name: "Hakediş Özet", href: "/hakedis", icon: Receipt },
+  { name: "İşveren Hakedişi", href: "/hakedis/isveren", icon: Landmark },
+  { name: "Taşeron Hakedişi", href: "/hakedis/taseron", icon: Building2 },
+  { name: "Sözleşmeler", href: "/hakedis/sozlesmeler", icon: FileText },
+  { name: "Keşif", href: "/hakedis/kesif", icon: FileSpreadsheet },
+];
+
+/* ─────── Proje İçi Navigasyon (Proje seçildikten sonra) ─────── */
+function getProjectScopedNav(projectId: string) {
+  return [
+    { name: "Proje Özeti", href: `/projeler/${projectId}`, icon: FolderKanban, exact: true },
+    { name: "Gösterge Paneli", href: `/projeler/${projectId}/dashboard`, icon: LayoutDashboard },
+    { name: "Mahaller", href: `/projeler/${projectId}/mahaller`, icon: MapPin },
+    { name: "Katlar", href: `/projeler/${projectId}/katlar`, icon: Layers },
+    { name: "Aktiviteler", href: `/projeler/${projectId}/aktiviteler`, icon: Activity },
+    { name: "Malzeme Takip", href: `/projeler/${projectId}/malzemeler`, icon: Package },
+    { name: "Onaylar", href: `/projeler/${projectId}/onaylar`, icon: CheckCircle2 },
+    { name: "Riskler", href: `/projeler/${projectId}/riskler`, icon: AlertTriangle },
+  ];
+}
 
 /* ─────── İK Navigasyonu ─────── */
 const ikNavigation = [
@@ -84,9 +125,25 @@ const isgNavigation = [
   { name: "İş Kazaları", href: "/isg/kazalar", icon: Siren },
 ];
 
+/* ─────── CRM Navigasyonu ─────── */
+const crmNavigation = [
+  { name: "CRM Özet", href: "/crm", icon: BarChart3 },
+  { name: "Müşteriler", href: "/crm/musteriler", icon: Building2 },
+  { name: "Fırsatlar", href: "/crm/firsatlar", icon: TrendingUp },
+  { name: "İletişim Geçmişi", href: "/crm/iletisim", icon: Users },
+];
+
+/* ─────── Duyurular Navigasyonu ─────── */
+const duyurularNavigation = [
+  { name: "Tüm Duyurular", href: "/duyurular", icon: Megaphone },
+  { name: "Yeni Duyuru", href: "/duyurular/yeni", icon: PlusCircle },
+  { name: "Kategoriler", href: "/duyurular/kategoriler", icon: Tag },
+];
+
 /* ─────── Organizasyon Navigasyonu ─────── */
 const orgNavigation = [
   { name: "Org. Şeması", href: "/organizasyon", icon: Network },
+  { name: "Ağaç Görünümü", href: "/organizasyon/agac", icon: GitBranch },
   { name: "Firma Profili", href: "/organizasyon/profil", icon: Building2 },
   { name: "İletişim Dizini", href: "/organizasyon/iletisim", icon: Users },
 ];
@@ -102,16 +159,49 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const [brand, setBrand] = useState<string | null>(null);
 
   // Hangi modüldeyiz?
+  const isCRM = pathname.startsWith("/crm");
+  const isDuyurular = pathname.startsWith("/duyurular");
   const isIK = pathname.startsWith("/ik");
   const isISG = pathname.startsWith("/isg");
   const isOrg = pathname.startsWith("/organizasyon");
-  const isProject = !isIK && !isISG && !isOrg;
+  const isHakedis = pathname.startsWith("/hakedis");
+  const activeProjectId = extractProjectId(pathname);
+  const isInsideProject = !!activeProjectId;
+  const isProject = !isCRM && !isDuyurular && !isIK && !isISG && !isOrg && !isHakedis;
 
   // Aktif modülün navigasyonu
-  const activeNav = isOrg ? orgNavigation : isIK ? ikNavigation : isISG ? isgNavigation : projectNavigation;
-  const moduleTitle = isOrg ? "Organizasyon" : isIK ? "İnsan Kaynakları" : isISG ? "İş Sağlığı & Güvenliği" : "Proje Yönetimi";
-  const ModuleIcon = isOrg ? Network : isIK ? UserCheck : isISG ? Shield : FolderKanban;
-  const moduleColor = isOrg ? "text-violet-600" : isIK ? "text-cyan-600" : isISG ? "text-red-600" : "text-blue-600";
+  const activeNav = isCRM
+    ? crmNavigation
+    : isDuyurular
+    ? duyurularNavigation
+    : isOrg
+    ? orgNavigation
+    : isIK
+    ? ikNavigation
+    : isISG
+    ? isgNavigation
+    : isHakedis
+    ? hakedisNavigation
+    : isInsideProject
+    ? getProjectScopedNav(activeProjectId)
+    : projectNavigation;
+  const moduleTitle = isCRM
+    ? "CRM & Müşteri"
+    : isDuyurular
+    ? "Duyurular"
+    : isOrg
+    ? "Organizasyon"
+    : isIK
+    ? "İnsan Kaynakları"
+    : isISG
+    ? "İş Sağlığı & Güvenliği"
+    : isHakedis
+    ? "Hakediş Yönetimi"
+    : isInsideProject
+    ? "Proje Modülleri"
+    : "Proje Yönetimi";
+  const ModuleIcon = isCRM ? UserCheck : isDuyurular ? Megaphone : isOrg ? Network : isIK ? UserCheck : isISG ? Shield : isHakedis ? Receipt : FolderKanban;
+  const moduleColor = isCRM ? "text-pink-600" : isDuyurular ? "text-sky-600" : isOrg ? "text-violet-600" : isIK ? "text-cyan-600" : isISG ? "text-red-600" : isHakedis ? "text-amber-600" : "text-blue-600";
 
   useEffect(() => {
     const saved = localStorage.getItem("theme-brand");
@@ -166,24 +256,37 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           Ana Sayfa
         </Link>
         <Link
-          href="/yonetim-paneli"
+          href="/duyurular"
           onClick={onNavigate}
           className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-            pathname.startsWith("/yonetim-paneli")
+            pathname.startsWith("/duyurular")
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           )}
         >
-          <BarChart3 className="h-5 w-5" />
-          Yönetici Paneli
+          <Megaphone className="h-5 w-5" />
+          Duyurular
         </Link>
+
       </div>
 
       <Separator className="mx-3 my-1" />
 
       {/* Navigasyon — sadece aktif modül */}
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+        {/* Proje içindeyken geri dön butonu */}
+        {isInsideProject && (
+          <Link
+            href="/projeler"
+            onClick={onNavigate}
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors mb-1"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Tüm Projeler
+          </Link>
+        )}
+
         {/* Modül Başlığı */}
         <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <ModuleIcon className={cn("h-3.5 w-3.5", moduleColor)} />
@@ -192,26 +295,38 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
         {/* Modül menü öğeleri */}
         <div className="space-y-0.5">
-          {activeNav.map((item) => {
-            const baseHref = isOrg ? "/organizasyon" : isIK ? "/ik" : isISG ? "/isg" : "";
-            const isActive = baseHref
-              ? (pathname === item.href || (item.href !== baseHref && pathname.startsWith(item.href)))
-              : pathname.startsWith(item.href);
+          {activeNav.map((item, index) => {
+            const typedItem = item as { name: string; href: string; icon: typeof FolderKanban; exact?: boolean };
+            const baseHref = isCRM ? "/crm" : isDuyurular ? "/duyurular" : isOrg ? "/organizasyon" : isIK ? "/ik" : isISG ? "/isg" : "";
+            let isActive: boolean;
+            if (typedItem.exact) {
+              isActive = pathname === typedItem.href;
+            } else if (isInsideProject) {
+              isActive = pathname === typedItem.href || (typedItem.href !== `/projeler/${activeProjectId}` && pathname.startsWith(typedItem.href));
+            } else if (baseHref) {
+              isActive = pathname === typedItem.href || (typedItem.href !== baseHref && pathname.startsWith(typedItem.href));
+            } else {
+              isActive = pathname.startsWith(typedItem.href);
+            }
+            const isEntryItem = index === 0 && !isCRM && !isDuyurular && !isIK && !isISG && !isOrg && !isInsideProject;
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={onNavigate}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.name}
-              </Link>
+              <div key={item.name}>
+                <Link
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    isEntryItem && "font-semibold"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+                {isEntryItem && <Separator className="my-1.5 mx-1" />}
+              </div>
             );
           })}
         </div>
