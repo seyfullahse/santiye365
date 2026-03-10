@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, Fragment } from "react";
+import { useEffect, useState, useCallback, useMemo, Fragment, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,7 +100,15 @@ function isWeekend(dateStr: string): boolean {
 
 const todayStr = formatDate(new Date());
 
-export default function AylikPuantajPage() {
+export default function AylikPuantajPageWrapper() {
+  return (
+    <Suspense fallback={<div className="p-4 text-muted-foreground">Yükleniyor...</div>}>
+      <AylikPuantajPage />
+    </Suspense>
+  );
+}
+
+function AylikPuantajPage() {
   const searchParams = useSearchParams();
   const initialProject = searchParams.get("project") || "all";
 
