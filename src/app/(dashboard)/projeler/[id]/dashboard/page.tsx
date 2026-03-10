@@ -195,6 +195,17 @@ async function getProjectDashboardData(projectId: string) {
       status: a.status,
     })),
     workforceTrend: workforceTrendData,
+    puantaj: {
+      activeWorkers: 0,
+      totalWorkers: 0,
+      todayPresent: 0,
+      todayAbsent: 0,
+      todayLeave: 0,
+      monthTotalHours: 0,
+      monthOvertime: 0,
+      pendingLeaves: 0,
+      trend: [],
+    },
   };
 }
 
