@@ -8,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 // Her schema değişikliğinde bu değeri güncelleyin (veya prisma generate bunu yapar)
-const SCHEMA_VERSION = "countdown-v1";
+const SCHEMA_VERSION = "sunum-v2";
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL!;

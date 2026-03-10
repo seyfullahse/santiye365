@@ -5,12 +5,13 @@ import type { NextRequest } from "next/server";
 export default async function middleware(req: NextRequest) {
   const isLoginPage = req.nextUrl.pathname.startsWith("/giris");
   const isTanitimPage = req.nextUrl.pathname.startsWith("/tanitim");
+  const isSunumEkran = req.nextUrl.pathname.startsWith("/sunum-ekran");
   const isApiRoute = req.nextUrl.pathname.startsWith("/api");
 
   // Middleware runs on the edge runtime, so use JWT-only verification here.
   const token = await getToken({ req, secret: process.env.AUTH_SECRET });
 
-  if (isApiRoute || isTanitimPage) {
+  if (isApiRoute || isTanitimPage || isSunumEkran) {
     return NextResponse.next();
   }
 

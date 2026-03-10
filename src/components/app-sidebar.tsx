@@ -46,6 +46,23 @@ import {
   Megaphone,
   Tag,
   PlusCircle,
+  LineChart,
+  Wallet,
+  ShoppingCart,
+  DollarSign,
+  PieChart,
+  Bot,
+  Truck,
+  Star,
+  Lock,
+  FileCheck,
+  Monitor,
+  Gavel,
+  Library,
+  ListOrdered,
+  ClipboardCheck,
+  CalendarRange,
+  Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -85,6 +102,23 @@ const hakedisNavigation = [
   { name: "Taşeron Hakedişi", href: "/hakedis/taseron", icon: Building2 },
   { name: "Sözleşmeler", href: "/hakedis/sozlesmeler", icon: FileText },
   { name: "Keşif", href: "/hakedis/kesif", icon: FileSpreadsheet },
+];
+
+/* ─────── Puantaj Navigasyonu ─────── */
+const puantajNavigation = [
+  { name: "Genel Bakış", href: "/puantaj", icon: LayoutDashboard },
+  { name: "Günlük Puantaj", href: "/puantaj/gunluk", icon: CalendarDays },
+  { name: "Aylık Puantaj", href: "/puantaj/aylik", icon: CalendarRange },
+  { name: "Çalışanlar", href: "/puantaj/calisanlar", icon: Users },
+  { name: "Raporlar", href: "/puantaj/raporlar", icon: BarChart3 },
+];
+
+/* ─────── Muhasebe Navigasyonu ─────── */
+const muhasebeNavigation = [
+  { name: "Muhasebe Özet", href: "/muhasebe", icon: Banknote },
+  { name: "Çalışan Ücretleri", href: "/muhasebe/ucretler", icon: DollarSign },
+  { name: "Puantaj Rapor", href: "/muhasebe/puantaj-rapor", icon: ClipboardList },
+  { name: "Maaş Hesaplama", href: "/muhasebe/maas-hesaplama", icon: Calculator },
 ];
 
 /* ─────── Proje İçi Navigasyon (Proje seçildikten sonra) ─────── */
@@ -146,16 +180,66 @@ const orgNavigation = [
   { name: "İletişim Dizini", href: "/organizasyon/iletisim", icon: Users },
 ];
 
+/* ─────── Yatırım & GYO Navigasyonu ─────── */
+const yatirimNavigation = [
+  { name: "Yatırım Özet", href: "/yatirim", icon: BarChart3 },
+  { name: "Portföy", href: "/yatirim/portfoy", icon: Building2 },
+  { name: "Fizibilite", href: "/yatirim/fizibilite", icon: Calculator },
+  { name: "Satış Takibi", href: "/yatirim/satis", icon: ShoppingCart },
+  { name: "Tahsilat Planı", href: "/yatirim/tahsilat", icon: DollarSign },
+  { name: "Nakit Projeksiyonu", href: "/yatirim/nakit", icon: Wallet },
+  { name: "ROI & Raporlar", href: "/yatirim/roi", icon: PieChart },
+];
+
+/* ─────── Taşeron Yönetimi Navigasyonu ─────── */
+const taseronNavigation = [
+  { name: "Taşeron Özet", href: "/taseron", icon: Truck },
+  { name: "Sözleşmeler", href: "/taseron/sozlesmeler", icon: FileText },
+  { name: "Hakediş", href: "/taseron/hakedis", icon: Receipt },
+  { name: "Puantaj", href: "/taseron/puantaj", icon: ClipboardList },
+  { name: "Performans", href: "/taseron/performans", icon: Star },
+  { name: "Kesinti & Teminat", href: "/taseron/kesinti-teminat", icon: Lock },
+  { name: "Evrak Takibi", href: "/taseron/evraklar", icon: FileCheck },
+];
+
+/* ─────── Maskot AI Navigasyonu ─────── */
+const maskotNavigation = [
+  { name: "Sohbet", href: "/maskot", icon: Bot },
+  { name: "Ayarlar", href: "/maskot/ayarlar", icon: Settings },
+];
+
+/* ─────── Teklif & İhale Navigasyonu ─────── */
+const teklifNavigation = [
+  { name: "Teklif Özet", href: "/teklif", icon: BarChart3 },
+  { name: "İhaleler", href: "/teklif/ihaleler", icon: Gavel },
+  { name: "Poz Kütüphanesi", href: "/teklif/poz-kutuphanesi", icon: Library },
+  { name: "Disiplinler", href: "/teklif/disiplinler", icon: ListOrdered },
+  { name: "İhale Arşivi", href: "/teklif/arsiv", icon: FolderOpen },
+];
+
+/* ─────── Toplantı Tutanakları Navigasyonu ─────── */
+const toplantiNavigation = [
+  { name: "Toplantılar", href: "/toplanti-tutanaklari", icon: ClipboardCheck },
+];
+
+/* ─────── Sunum Navigasyonu ─────── */
+const sunumNavigation = [
+  { name: "Sunumlar", href: "/sunum", icon: Monitor },
+];
+
+/* ─────── Kullanıcı Yönetimi Navigasyonu ─────── */
+const kullanicilarNavigation = [
+  { name: "Kullanıcılar", href: "/kullanicilar", icon: Users },
+];
+
 const adminNavigation = [
-  { name: "Ayarlar", href: "/ayarlar", icon: Settings },
+  { name: "Kullanıcı Yönetimi", href: "/kullanicilar", icon: Users },
 ];
 
 /* ─────── SIDEBAR CONTENT ─────── */
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const [brand, setBrand] = useState<string | null>(null);
-
   // Hangi modüldeyiz?
   const isCRM = pathname.startsWith("/crm");
   const isDuyurular = pathname.startsWith("/duyurular");
@@ -163,9 +247,18 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const isISG = pathname.startsWith("/isg");
   const isOrg = pathname.startsWith("/organizasyon");
   const isHakedis = pathname.startsWith("/hakedis");
+  const isYatirim = pathname.startsWith("/yatirim");
+  const isTaseron = pathname.startsWith("/taseron");
+  const isMaskot = pathname.startsWith("/maskot");
+  const isKullanicilar = pathname.startsWith("/kullanicilar");
+  const isSunum = pathname.startsWith("/sunum");
+  const isTeklif = pathname.startsWith("/teklif");
+  const isToplanti = pathname.startsWith("/toplanti-tutanaklari");
+  const isPuantaj = pathname.startsWith("/puantaj");
+  const isMuhasebe = pathname.startsWith("/muhasebe");
   const activeProjectId = extractProjectId(pathname);
   const isInsideProject = !!activeProjectId;
-  const isProject = !isCRM && !isDuyurular && !isIK && !isISG && !isOrg && !isHakedis;
+  const isProject = !isCRM && !isDuyurular && !isIK && !isISG && !isOrg && !isHakedis && !isYatirim && !isTaseron && !isMaskot && !isKullanicilar && !isSunum && !isTeklif && !isToplanti && !isPuantaj && !isMuhasebe;
 
   // Aktif modülün navigasyonu
   const activeNav = isCRM
@@ -180,6 +273,24 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     ? isgNavigation
     : isHakedis
     ? hakedisNavigation
+    : isYatirim
+    ? yatirimNavigation
+    : isTaseron
+    ? taseronNavigation
+    : isMaskot
+    ? maskotNavigation
+    : isKullanicilar
+    ? kullanicilarNavigation
+    : isSunum
+    ? sunumNavigation
+    : isTeklif
+    ? teklifNavigation
+    : isToplanti
+    ? toplantiNavigation
+    : isPuantaj
+    ? puantajNavigation
+    : isMuhasebe
+    ? muhasebeNavigation
     : isInsideProject
     ? getProjectScopedNav(activeProjectId)
     : projectNavigation;
@@ -195,36 +306,37 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     ? "İş Sağlığı & Güvenliği"
     : isHakedis
     ? "Hakediş Yönetimi"
+    : isYatirim
+    ? "Yatırım & GYO"
+    : isTaseron
+    ? "Taşeron Yönetimi"
+    : isMaskot
+    ? "Maskot AI Asistan"
+    : isKullanicilar
+    ? "Kullanıcı Yönetimi"
+    : isSunum
+    ? "Sunum Ekranı"
+    : isTeklif
+    ? "Teklif & İhale"
+    : isToplanti
+    ? "Toplantı Tutanakları"
+    : isPuantaj
+    ? "Puantaj Sistemi"
+    : isMuhasebe
+    ? "Muhasebe"
     : isInsideProject
     ? "Proje Modülleri"
     : "Proje Yönetimi";
-  const ModuleIcon = isCRM ? UserCheck : isDuyurular ? Megaphone : isOrg ? Network : isIK ? UserCheck : isISG ? Shield : isHakedis ? Receipt : FolderKanban;
-  const moduleColor = isCRM ? "text-pink-600" : isDuyurular ? "text-sky-600" : isOrg ? "text-violet-600" : isIK ? "text-cyan-600" : isISG ? "text-red-600" : isHakedis ? "text-amber-600" : "text-blue-600";
+  const ModuleIcon = isCRM ? UserCheck : isDuyurular ? Megaphone : isOrg ? Network : isIK ? UserCheck : isISG ? Shield : isHakedis ? Receipt : isYatirim ? LineChart : isTaseron ? Truck : isMaskot ? Bot : isKullanicilar ? Users : isSunum ? Monitor : isTeklif ? Gavel : isToplanti ? ClipboardCheck : isPuantaj ? ClipboardList : isMuhasebe ? Banknote : FolderKanban;
+  const moduleColor = isCRM ? "text-pink-600" : isDuyurular ? "text-sky-600" : isOrg ? "text-violet-600" : isIK ? "text-cyan-600" : isISG ? "text-red-600" : isHakedis ? "text-amber-600" : isYatirim ? "text-emerald-600" : isTaseron ? "text-orange-600" : isMaskot ? "text-purple-600" : isKullanicilar ? "text-indigo-600" : isSunum ? "text-teal-600" : isTeklif ? "text-rose-600" : isToplanti ? "text-lime-600" : isPuantaj ? "text-teal-600" : isMuhasebe ? "text-green-600" : "text-blue-600";
 
+  // Load saved theme brand on mount
   useEffect(() => {
     const saved = localStorage.getItem("theme-brand");
     if (saved) {
-      applyBrand(saved);
-      setBrand(saved);
+      document.documentElement.style.setProperty("--brand", saved);
     }
   }, []);
-
-  const applyBrand = (value: string) => {
-    const root = document.documentElement;
-    root.style.setProperty("--brand", value);
-  };
-
-  const handleBrandChange = (value: string) => {
-    applyBrand(value);
-    setBrand(value);
-    localStorage.setItem("theme-brand", value);
-  };
-
-  const brandOptions = [
-    { label: "Siyah", value: "oklch(0.205 0 0)" },
-    { label: "Mavi", value: "oklch(0.68 0.11 220)" },
-    { label: "Yeşil", value: "oklch(0.72 0.12 160)" },
-  ];
 
   return (
     <div className="flex h-full flex-col">
@@ -295,7 +407,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="space-y-0.5">
           {activeNav.map((item, index) => {
             const typedItem = item as { name: string; href: string; icon: typeof FolderKanban; exact?: boolean };
-            const baseHref = isCRM ? "/crm" : isDuyurular ? "/duyurular" : isOrg ? "/organizasyon" : isIK ? "/ik" : isISG ? "/isg" : "";
+            const baseHref = isCRM ? "/crm" : isDuyurular ? "/duyurular" : isOrg ? "/organizasyon" : isIK ? "/ik" : isISG ? "/isg" : isYatirim ? "/yatirim" : isTaseron ? "/taseron" : isMaskot ? "/maskot" : isKullanicilar ? "/kullanicilar" : isSunum ? "/sunum" : isTeklif ? "/teklif" : isToplanti ? "/toplanti-tutanaklari" : "";
             let isActive: boolean;
             if (typedItem.exact) {
               isActive = pathname === typedItem.href;
@@ -306,7 +418,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             } else {
               isActive = pathname.startsWith(typedItem.href);
             }
-            const isEntryItem = index === 0 && !isCRM && !isDuyurular && !isIK && !isISG && !isOrg && !isInsideProject;
+            const isEntryItem = index === 0 && !isCRM && !isDuyurular && !isIK && !isISG && !isOrg && !isYatirim && !isTaseron && !isMaskot && !isKullanicilar && !isSunum && !isTeklif && !isToplanti && !isInsideProject;
             return (
               <div key={item.name}>
                 <Link
@@ -328,56 +440,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             );
           })}
         </div>
-
-        {/* Admin bölümü */}
-        {session?.user?.role === "ADMIN" && (
-          <>
-            <Separator className="my-2" />
-            {adminNavigation.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </>
-        )}
       </nav>
 
       <Separator />
 
-      {/* Theme + User */}
+      {/* User */}
       <div className="p-4 space-y-4">
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground mb-2">Tema Rengi</p>
-          <div className="flex gap-2">
-            {brandOptions.map((opt) => (
-              <button
-                key={opt.value}
-                aria-label={opt.label}
-                onClick={() => handleBrandChange(opt.value)}
-                className={cn(
-                  "h-8 w-8 rounded-full border shadow-sm transition",
-                  brand === opt.value ? "ring-2 ring-ring ring-offset-2" : ""
-                )}
-                style={{ background: opt.value }}
-              />
-            ))}
-          </div>
-        </div>
-
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
             <AvatarFallback>
@@ -392,6 +460,16 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               {session?.user?.email ?? ""}
             </p>
           </div>
+          <Link href="/ayarlar" onClick={onNavigate}>
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Ayarlar"
+              className={cn(pathname.startsWith("/ayarlar") && "bg-accent")}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </Link>
           <Button
             variant="ghost"
             size="icon"

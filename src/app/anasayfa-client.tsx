@@ -44,6 +44,12 @@ import {
   Network,
   Receipt,
   Megaphone,
+  Settings,
+  Eye,
+  EyeOff,
+  ShieldAlert,
+  ClipboardCheck,
+  Banknote,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +77,7 @@ interface RecentActivity {
 interface AnasayfaProps {
   userName: string;
   userEmail: string;
+  userRole: string;
   kpiData: KpiData;
   recentActivities: RecentActivity[];
 }
@@ -131,22 +138,40 @@ const classicModules: ClassicModule[] = [
     status: "active",
   },
   {
+    name: "Puantaj Sistemi",
+    icon: ClipboardList,
+    href: "/puantaj",
+    color: "bg-teal-600",
+    description: "Günlük devam, mesai ve izin takibi",
+    features: ["Günlük Puantaj", "Aylık Puantaj", "Çalışan Yönetimi", "İzin Takibi", "Mesai Hesaplama", "Firma & Ekip Bazlı", "Raporlar"],
+    status: "active",
+  },
+  {
+    name: "Muhasebe",
+    icon: Banknote,
+    href: "/muhasebe",
+    color: "bg-green-600",
+    description: "Ücret girişi ve puantaj maliyet raporu",
+    features: ["Çalışan Ücretleri", "Birim Fiyat Girişi", "Mesai Ücreti", "Puantaj Maliyet Raporu", "Firma Bazlı Analiz", "Excel Dışa Aktarım"],
+    status: "active",
+  },
+  {
     name: "İhale & Teklif",
     icon: Gavel,
-    href: "#",
+    href: "/teklif",
     color: "bg-indigo-500",
     description: "Teklif hazırlama ve ihale yönetimi",
     features: ["Teklif hazırlama", "Metraj", "Poz Kütüphanesi", "Birim fiyat", "Revizyon takibi", "Karlılık simülasyonu", "Mukayese", "İhale arşivi"],
-    status: "soon",
+    status: "active",
   },
   {
     name: "Taşeron Yönetimi",
     icon: Truck,
-    href: "#",
+    href: "/taseron",
     color: "bg-rose-500",
     description: "Taşeron firma ve sözleşme takibi",
     features: ["Firma kartı", "Sözleşme", "Hakediş", "Puantaj", "Performans", "Kesinti & Teminat", "Evrak takibi"],
-    status: "soon",
+    status: "active",
   },
   {
     name: "Finans & Bütçe",
@@ -205,11 +230,11 @@ const classicModules: ClassicModule[] = [
   {
     name: "Yatırım & GYO",
     icon: TrendingUp,
-    href: "#",
-    color: "bg-violet-600",
+    href: "/yatirim",
+    color: "bg-emerald-600",
     description: "Yatırım portföy ve fizibilite",
     features: ["Proje fizibilite", "ROI analizi", "Yatırım takip", "Portföy", "Satış takibi", "Tahsilat planı", "Nakit projeksiyonu"],
-    status: "soon",
+    status: "active",
   },
   {
     name: "CRM & Müşteri",
@@ -227,6 +252,33 @@ const classicModules: ClassicModule[] = [
     color: "bg-sky-500",
     description: "Şirket duyuru ve bildirim yönetimi",
     features: ["Duyuru oluşturma", "Kategori yönetimi", "Öncelik seviyeleri", "Hedef kitle", "Okunma takibi", "Sabitleme", "Zamanlama"],
+    status: "active",
+  },
+  {
+    name: "Maskot AI Asistan",
+    icon: Bot,
+    href: "/maskot",
+    color: "bg-purple-500",
+    description: "Sesli AI asistan ile şantiye sohbeti",
+    features: ["3 Karakter", "Sesli sohbet", "GPT-4o AI", "Kişilik yönetimi", "Prompt ayarları", "Sohbet geçmişi", "TTS & STT"],
+    status: "active",
+  },
+  {
+    name: "Sunum Ekranı",
+    icon: Monitor,
+    href: "/sunum",
+    color: "bg-teal-500",
+    description: "Mimari render ve sunum gösterimi",
+    features: ["Slayt gösterisi", "Izgara görünüm", "TV modu", "Resim yükleme", "Otomatik geçiş"],
+    status: "active",
+  },
+  {
+    name: "Toplantı Tutanakları",
+    icon: ClipboardCheck,
+    href: "/toplanti-tutanaklari",
+    color: "bg-lime-600",
+    description: "Haftalık toplantı tutanağı ve takibi",
+    features: ["Dinamik tablo", "Checklist", "Yorum sistemi", "Katılımcı takibi", "Toplantı türleri", "İlerleme takibi", "Sütun ekleme"],
     status: "active",
   },
   {
@@ -248,11 +300,20 @@ const classicModules: ClassicModule[] = [
     status: "soon",
   },
   {
+    name: "Kullanıcı Yönetimi",
+    icon: Users,
+    href: "/kullanicilar",
+    color: "bg-indigo-600",
+    description: "Sistem hesapları ve İK çalışan bağlantısı",
+    features: ["Hesap oluşturma", "Rol atama", "İK bağlantısı", "Aktif/Pasif", "5 Rol seviyesi", "Son giriş takibi"],
+    status: "active",
+  },
+  {
     name: "Rol & Yetki Yönetimi",
     icon: Lock,
     href: "#",
     color: "bg-slate-600",
-    description: "Kullanıcı ve erişim kontrolü",
+    description: "İzin matrisi ve erişim kontrolü",
     features: ["Rol tanımlama", "Yetki matrisi", "Modül bazlı erişim", "Proje bazlı erişim", "Firma bazlı erişim", "Onay yetkileri", "Log kayıtları"],
     status: "soon",
   },
@@ -428,9 +489,10 @@ function AnnouncementWidget() {
   );
 }
 
-function ClassicView({ userName, userEmail, kpiData, recentActivities }: AnasayfaProps) {
+function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities }: AnasayfaProps) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
+  const isSuperAdmin = userRole === "SUPER_ADMIN";
 
   return (
     <div className="min-h-screen bg-background">
@@ -450,6 +512,9 @@ function ClassicView({ userName, userEmail, kpiData, recentActivities }: Anasayf
             <Avatar className="h-8 w-8">
               <AvatarFallback className="text-xs font-semibold">{userName.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
+            <Link href="/ayarlar" className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Ayarlar">
+              <Settings className="h-4 w-4" />
+            </Link>
             <button onClick={() => signOut({ redirectTo: "/giris" })} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Çıkış Yap">
               <LogOut className="h-4 w-4" />
             </button>
@@ -469,6 +534,27 @@ function ClassicView({ userName, userEmail, kpiData, recentActivities }: Anasayf
           <ClassicKpiCard icon={Calendar} value={kpiData.todayAttendance} label="Bugün Devam" color="bg-amber-500" />
           <ClassicKpiCard icon={CheckCircle2} value={kpiData.pendingApprovals} label="Bekleyen Onay" color="bg-purple-500" />
         </div>
+
+        {/* === KORUNAN ALAN: Modüller + Hızlı Erişim + Aktiviteler === */}
+        <div className="relative">
+          {!isSuperAdmin && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[2px]">
+              <div className="flex flex-col items-center gap-3 p-8 rounded-2xl bg-card border shadow-2xl text-center max-w-sm mx-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <Lock className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-bold">Geliştirme Aşamasında</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Modüller şu anda geliştirme aşamasındadır. Sadece yetkili yöneticiler erişebilir.
+                </p>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 mt-1">
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  <span>Süper Admin yetkisi gerekli</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className={!isSuperAdmin ? "pointer-events-none select-none filter blur-[6px] opacity-50" : undefined}>
 
         <div>
           <div className="flex items-center gap-2 mb-4">
@@ -582,6 +668,9 @@ function ClassicView({ userName, userEmail, kpiData, recentActivities }: Anasayf
           </div>
         )}
 
+          </div>{/* blur wrapper end */}
+        </div>{/* relative wrapper end */}
+
         <div className="text-center py-4 text-xs text-muted-foreground">
           © 2026 AIWorks Lab — Created by <span className="font-medium">Seyfullah SEPET</span>
         </div>
@@ -638,6 +727,16 @@ const aiSections = [
     modules: [
       { key: "hakedis", name: "Hakediş Motoru", tagline: "Otomatik metraj hesabı, kesinti yönetimi. Her kuruş dijital kayıtta.", icon: FileText, href: "/hakedis", active: true, gradient: "from-purple-500 to-fuchsia-500", bg: "bg-purple-500/10", text: "text-purple-500" },
       { key: "malzemeler", name: "Malzeme Tedarik Zekası", tagline: "Stok, sipariş, teslimat. Tedarik zinciri uçtan uca kontrolde.", icon: Package, href: "/malzemeler", active: true, gradient: "from-violet-500 to-purple-500", bg: "bg-violet-500/10", text: "text-violet-500" },
+    ],
+  },
+  {
+    id: "meetings",
+    title: "TOPLANTI MERKEZİ",
+    subtitle: "Haftalık toplantı ve karar takibi",
+    color: "from-lime-500 to-green-500",
+    dotColor: "bg-lime-500",
+    modules: [
+      { key: "toplanti-tutanaklari", name: "Toplantı Tutanakları", tagline: "Her karar kayıt altında. Dinamik tablolarla toplantı yönetimi.", icon: ClipboardCheck, href: "/toplanti-tutanaklari", active: true, gradient: "from-lime-500 to-green-500", bg: "bg-lime-500/10", text: "text-lime-500" },
     ],
   },
   {
@@ -776,7 +875,8 @@ function PresentationSection({ section, aiModules, sectionIndex }: { section: (t
 
 /* ── AI View ── */
 
-function AIView({ userName, userEmail, kpiData }: AnasayfaProps) {
+function AIView({ userName, userEmail, userRole, kpiData }: AnasayfaProps) {
+  const isSuperAdmin = userRole === "SUPER_ADMIN";
   const [aiData, setAiData] = useState<AIData | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [aiLoading, setAiLoading] = useState(true);
@@ -785,7 +885,7 @@ function AIView({ userName, userEmail, kpiData }: AnasayfaProps) {
   const hasFetched = useRef(false);
 
   const fetchAI = useCallback(async () => {
-    if (hasFetched.current) return;
+    if (hasFetched.current || !isSuperAdmin) return;
     hasFetched.current = true;
     try {
       const res = await fetch("/api/ai/dashboard-summary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userName }) });
@@ -824,6 +924,24 @@ function AIView({ userName, userEmail, kpiData }: AnasayfaProps) {
       </header>
 
       <main className="relative mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-12 space-y-16">
+        {!isSuperAdmin ? (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="flex flex-col items-center gap-4 p-10 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm text-center max-w-sm">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/10">
+                <Lock className="h-8 w-8 text-violet-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Geliştirme Aşamasında</h3>
+              <p className="text-sm text-white/40 leading-relaxed">
+                AI Sunum modu şu anda geliştirme aşamasındadır. Sadece yetkili yöneticiler erişebilir.
+              </p>
+              <div className="flex items-center gap-1.5 text-xs text-white/25 mt-1">
+                <ShieldAlert className="h-3.5 w-3.5" />
+                <span>Süper Admin yetkisi gerekli</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+        <>
         <AnimatePresence>
           {showContent && (
             <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
@@ -884,6 +1002,8 @@ function AIView({ userName, userEmail, kpiData }: AnasayfaProps) {
             </div>
           </motion.div>
         )}
+        </>
+        )}
       </main>
 
       <footer className="border-t border-white/5 py-6 text-center text-[11px] text-white/20">
@@ -927,12 +1047,17 @@ function AnasayfaContent(props: AnasayfaProps) {
     localStorage.setItem("santiye360-view", mode);
   };
 
-  if (!mounted) return null;
-
+  /* mounted olmasa bile ClassicView render edilir — 
+     böylece server HTML ile client ilk render eşleşir, 
+     boş ekran (flash) yaşanmaz */
   return (
     <>
-      <ViewToggle mode={viewMode} onChange={handleViewChange} />
-      {viewMode === "classic" ? <ClassicView {...props} /> : <AIView {...props} />}
+      {mounted && <ViewToggle mode={viewMode} onChange={handleViewChange} />}
+      {viewMode === "classic" || !mounted ? (
+        <ClassicView {...props} />
+      ) : (
+        <AIView {...props} />
+      )}
     </>
   );
 }

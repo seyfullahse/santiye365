@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error("Duyuru listesi hatası:", error);
+    console.error("Duyuru listesi hatası:", JSON.stringify(error, null, 2));
     return NextResponse.json(
       { error: "Duyurular yüklenirken bir hata oluştu" },
       { status: 500 }

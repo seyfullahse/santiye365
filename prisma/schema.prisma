@@ -14,20 +14,34 @@ model User {
   email         String    @unique
   password      String
   role          UserRole  @default(USER)
+  isActive      Boolean   @default(true) @map("is_active")
+  phone         String?
+  avatar        String?
+  lastLoginAt   DateTime? @map("last_login_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Employee bağlantısı (opsiyonel — İK çalışanına bağlanabilir)
+  employeeId    String?   @unique @map("employee_id")
+  employee      Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
   comments      ActivityComment[]
   announcements       Announcement[]
   announcementReads   AnnouncementRead[]
   countdownTimers     CountdownTimer[]
+  taseronPuantajlar   TaseronPuantaj[]   @relation("TaseronPuantajCreator")
+  taseronPerformanslar TaseronPerformans[] @relation("TaseronPerformansEvaluator")
 
   @@map("users")
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
+  MANAGER
+  MUHASEBE
   USER
+  VIEWER
 }
 
 // ─── PROJELER ────────────────────────────────────────────
@@ -53,6 +67,9 @@ model Project {
   hakedisContracts HakedisContract[]
   employees   Employee[]
   accidents   WorkAccident[]
+  tenders     Tender[]
+  meetings    Meeting[]
+  teams       Team[]
 
   @@map("projects")
 }
@@ -225,15 +242,40 @@ model ActivityComment {
 
 // ─── ŞİRKETLER ───────────────────────────────────────────
 model Company {
-  id        String      @id @default(cuid())
-  name      String
-  type      CompanyType @default(SUBCONTRACTOR)
-  sortOrder Int         @default(0) @map("sort_order")
+  id           String      @id @default(cuid())
+  name         String
+  type         CompanyType @default(SUBCONTRACTOR)
+  sortOrder    Int         @default(0) @map("sort_order")
+
+  // İletişim bilgileri
+  phone        String?                             // Telefon
+  email        String?                             // E-posta
+  website      String?                             // Web sitesi
+  address      String?                             // Adres
+  city         String?                             // Şehir
+  district     String?                             // İlçe
+
+  // Firma bilgileri
+  taxOffice    String?    @map("tax_office")       // Vergi dairesi
+  taxNo        String?    @map("tax_no")           // Vergi no
+  contactPerson String?   @map("contact_person")   // Yetkili kişi
+  contactPhone  String?   @map("contact_phone")    // Yetkili telefon
+  specialization String?                           // Uzmanlık alanı (Elektrik, Mekanik, Kaba İnşaat...)
+  notes        String?    @db.Text                 // Notlar
+  isActive     Boolean    @default(true) @map("is_active")
+  rating       Float?                              // Genel puan (1-10, performanstan hesaplanır)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
 
   teams Team[]
   hakedisler Hakedis[]
   hakedisContracts HakedisContract[]
   employees  Employee[]
+  taseronPerformanslar TaseronPerformans[]
+  taseronKesintiler    TaseronKesinti[]
+  taseronTeminatlar    TaseronTeminat[]
+  taseronEvraklar      TaseronEvrak[]
+  taseronPuantajlar    TaseronPuantaj[]
 
   @@map("companies")
 }
@@ -246,13 +288,15 @@ enum CompanyType {
 
 // ─── EKİPLER ─────────────────────────────────────────────
 model Team {
-  id           String @id @default(cuid())
-  companyId    String @map("company_id")
+  id           String   @id @default(cuid())
+  companyId    String   @map("company_id")
+  projectId    String?  @map("project_id")
   name         String
-  disciplineId String @map("discipline_id")
-  sortOrder    Int    @default(0) @map("sort_order")
+  disciplineId String   @map("discipline_id")
+  sortOrder    Int      @default(0) @map("sort_order")
 
   company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project    Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   discipline Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
 
   workforce  WorkforceDaily[]
@@ -264,21 +308,55 @@ model Team {
 
 // ─── ÇALIŞANLAR ──────────────────────────────────────────
 model Worker {
-  id        String   @id @default(cuid())
-  teamId    String   @map("team_id")
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
-  role      String                          // Görevi (Kalıpçı, Formen, Elektrikçi vb.)
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
+  id               String    @id @default(cuid())
+  teamId           String    @map("team_id")
+  firstName        String    @map("first_name")
+  lastName         String    @map("last_name")
+  role             String                               // Görevi (Kalıpçı, Formen, Elektrikçi vb.)
+  identityNo       String?   @map("identity_no")        // TC Kimlik No
+  phone            String?                              // Telefon
+  dailyRate        Float?    @map("daily_rate")          // Günlük ücret
+  overtimeRate     Float?    @map("overtime_rate")       // Mesai saati ücreti
+  position         String?                              // Pozisyon/Unvan
+  bloodType        String?   @map("blood_type")          // Kan grubu
+  emergencyContact String?   @map("emergency_contact")   // Acil durum kişisi
+  emergencyPhone   String?   @map("emergency_phone")     // Acil durum tel
+  isActive         Boolean   @default(true) @map("is_active")
+  startDate        DateTime? @map("start_date") @db.Date // İşe başlama
+  endDate          DateTime? @map("end_date") @db.Date   // İşten çıkış
+  sortOrder        Int       @default(0) @map("sort_order")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  team        Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  attendances Attendance[]
+  team          Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  attendances   Attendance[]
+  leaveRequests WorkerLeave[]
+  salaries      WorkerSalary[]
 
   @@map("workers")
 }
 
 // ─── PUANTAJ (GÜNLÜK YOKLAMA) ────────────────────────────
+
+// Çalışan Maaş/Ücret Geçmişi
+model WorkerSalary {
+  id            String      @id @default(cuid())
+  workerId      String      @map("worker_id")
+  salaryType    SalaryType  @map("salary_type")
+  amount        Float                                   // Aylık maaş (MONTHLY) veya günlük ücret (DAILY)
+  overtimeRate  Float       @default(0) @map("overtime_rate") // Saatlik mesai ücreti
+  effectiveFrom DateTime    @map("effective_from") @db.Date
+  effectiveTo   DateTime?   @map("effective_to") @db.Date  // null = halen geçerli
+  note          String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  worker        Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId, effectiveFrom])
+  @@map("worker_salaries")
+}
+
 model Attendance {
   id         String           @id @default(cuid())
   workerId   String           @map("worker_id")
@@ -311,6 +389,42 @@ enum AttendanceStatus {
   ANNUAL_LEAVE  // Yıllık izin
   SICK_LEAVE    // Raporlu
   DAY_OFF       // Hafta tatili
+}
+
+// ─── İŞÇİ İZİN TALEPLERİ (PUANTAJ) ─────────────────────
+model WorkerLeave {
+  id          String            @id @default(cuid())
+  workerId    String            @map("worker_id")
+  type        WorkerLeaveType
+  startDate   DateTime          @map("start_date") @db.Date
+  endDate     DateTime          @map("end_date") @db.Date
+  totalDays   Int               @map("total_days")
+  reason      String?           @db.Text
+  status      WorkerLeaveStatus @default(PENDING)
+  approvedBy  String?           @map("approved_by")
+  approvedAt  DateTime?         @map("approved_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  worker      Worker            @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@map("worker_leaves")
+}
+
+enum WorkerLeaveType {
+  PAID_LEAVE    // Ücretli izin
+  UNPAID_LEAVE  // Ücretsiz izin
+  ANNUAL_LEAVE  // Yıllık izin
+  SICK_LEAVE    // Raporlu
+  MATERNITY     // Doğum izni
+  OTHER         // Diğer
+}
+
+enum WorkerLeaveStatus {
+  PENDING       // Beklemede
+  APPROVED      // Onaylandı
+  REJECTED      // Reddedildi
+  CANCELLED     // İptal
 }
 
 // ─── MALZEME TAKİP ───────────────────────────────────────
@@ -415,6 +529,10 @@ model HakedisContract {
   atasmanlar      Atasman[]
   hakedisler      Hakedis[]
   ihzaratlar      Ihzarat[]
+  taseronPuantajlar    TaseronPuantaj[]
+  taseronPerformanslar TaseronPerformans[]
+  taseronKesintiler    TaseronKesinti[]
+  taseronTeminatlar    TaseronTeminat[]
 
   @@map("hakedis_contracts")
 }
@@ -526,6 +644,7 @@ model Hakedis {
   contract          HakedisContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
   atasmanlar        Atasman[]
   ihzaratlar        Ihzarat[]
+  taseronKesintiler TaseronKesinti[]
 
   @@map("hakedis")
 }
@@ -684,6 +803,9 @@ model Employee {
   medicalExams      MedicalExam[]
   ppeAssignments    PPEAssignment[]
   accidents         WorkAccidentEmployee[]
+
+  // Sistem Kullanıcı Hesabı (opsiyonel — 1:0..1)
+  user              User?
 
   @@map("employees")
 }
@@ -1169,6 +1291,7 @@ model Customer {
   opportunities Opportunity[]
   communications CommunicationLog[]
   projects      Project[]
+  unitSales     UnitSale[]
 
   @@map("customers")
 }
@@ -1293,7 +1416,7 @@ model Announcement {
   categoryId   String    @map("category_id")
   priority     AnnouncementPriority @default(NORMAL)
   isPinned     Boolean   @default(false) @map("is_pinned")
-  targetType   AnnouncementTarget   @default(EVERYONE)
+  targetType   AnnouncementTarget   @default(EVERYONE) @map("target_type")
   targetRoles  String[]  @default([]) @map("target_roles")  // hedef roller (ADMIN, USER, vb.)
   authorId     String    @map("author_id")
   publishDate  DateTime  @default(now()) @map("publish_date")
@@ -1350,5 +1473,830 @@ model CountdownTimer {
 
   createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
+  presentations Presentation[]
+
   @@map("countdown_timers")
+}
+
+model SayacMessage {
+  id        String   @id @default(cuid())
+  text      String
+  icon      String   @default("Zap")
+  type      String   @default("active") // "active" veya "expired"
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("sayac_messages")
+}
+
+// ═══════════════════════════════════════════════════════════
+// ─── YATIRIM & GYO MODÜLÜ ────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+
+enum InvestmentProjectType {
+  KONUT
+  AVM
+  OTEL
+  OFIS
+  ARSA
+  KARMA
+}
+
+enum InvestmentProjectStatus {
+  FIZIBILITE
+  INSAAT
+  SATISTA
+  TAMAMLANDI
+  IPTAL
+}
+
+enum UnitType {
+  DAIRE_1_1
+  DAIRE_2_1
+  DAIRE_3_1
+  DAIRE_4_1
+  DUKKAN
+  OFIS
+  VILLA
+  DIGER
+}
+
+enum UnitStatus {
+  BOS
+  OPSIYONLU
+  SATILDI
+  TESLIM_EDILDI
+}
+
+enum PaymentType {
+  PESINAT
+  TAKSIT
+  ARA_ODEME
+  TESLIMDE
+  DIGER
+}
+
+enum PaymentStatus {
+  BEKLENIYOR
+  ODENDI
+  GECIKTI
+  IPTAL
+}
+
+enum FeasibilityType {
+  MALIYET
+  GELIR
+}
+
+enum CashFlowType {
+  GIRIS
+  CIKIS
+}
+
+// ─── YATIRIM PROJESİ (Portföy) ──────────────────────────
+model InvestmentProject {
+  id              String                  @id @default(cuid())
+  name            String                   // Proje adı (ör: "Kuzey Park Konutları")
+  type            InvestmentProjectType    @default(KONUT)
+  status          InvestmentProjectStatus  @default(FIZIBILITE)
+  city            String?                  // Şehir
+  district        String?                  // İlçe
+  address         String?
+  landArea        Float?                   @map("land_area")          // Arsa m²
+  constructionArea Float?                  @map("construction_area")  // İnşaat m²
+  totalUnits      Int                      @default(0) @map("total_units")
+  totalBudget     Float                    @default(0) @map("total_budget")     // Toplam bütçe (TL)
+  totalRevenue    Float                    @default(0) @map("total_revenue")    // Hedef toplam gelir (TL)
+  startDate       DateTime?                @map("start_date")
+  endDate         DateTime?                @map("end_date")
+  completionPct   Float                    @default(0) @map("completion_pct")   // İnşaat ilerleme %
+  description     String?                  @db.Text
+  imageUrl        String?                  @map("image_url")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+
+  units           ProjectUnit[]
+  feasibilityItems FeasibilityItem[]
+  cashFlowEntries CashFlowEntry[]
+
+  @@map("investment_projects")
+}
+
+// ─── FİZİBİLİTE KALEMİ ──────────────────────────────────
+model FeasibilityItem {
+  id              String            @id @default(cuid())
+  projectId       String            @map("project_id")
+  type            FeasibilityType   @default(MALIYET)
+  category        String                    // Kategori (ör: "Arsa", "İnşaat", "Satış Geliri")
+  description     String?
+  amount          Float             @default(0)   // Tutar (TL)
+  sortOrder       Int               @default(0)   @map("sort_order")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  project         InvestmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("feasibility_items")
+}
+
+// ─── PROJE BİRİMİ (Daire / Dükkan / Ofis) ──────────────
+model ProjectUnit {
+  id              String            @id @default(cuid())
+  projectId       String            @map("project_id")
+  unitNo          String            @map("unit_no")          // Birim No (ör: "A-101")
+  type            UnitType          @default(DAIRE_2_1)
+  floor           Int               @default(0)              // Kat
+  grossArea       Float?            @map("gross_area")       // Brüt m²
+  netArea         Float?            @map("net_area")         // Net m²
+  roomCount       String?           @map("room_count")       // Oda sayısı (1+1, 2+1 vb)
+  listPrice       Float             @default(0) @map("list_price")   // Liste fiyatı
+  status          UnitStatus        @default(BOS)
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  project         InvestmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sale            UnitSale?
+
+  @@map("project_units")
+}
+
+// ─── BİRİM SATIŞI ───────────────────────────────────────
+model UnitSale {
+  id              String          @id @default(cuid())
+  unitId          String          @unique @map("unit_id")
+  customerId      String?         @map("customer_id")       // CRM müşterisi
+  buyerName       String          @map("buyer_name")         // Alıcı adı
+  buyerPhone      String?         @map("buyer_phone")
+  buyerEmail      String?         @map("buyer_email")
+  salePrice       Float           @map("sale_price")         // Satış fiyatı
+  saleDate        DateTime        @map("sale_date")
+  contractNo      String?         @map("contract_no")        // Sözleşme no
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  unit            ProjectUnit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  customer        Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  payments        PaymentPlan[]
+
+  @@map("unit_sales")
+}
+
+// ─── TAHSİLAT PLANI (Taksitler) ─────────────────────────
+model PaymentPlan {
+  id              String          @id @default(cuid())
+  saleId          String          @map("sale_id")
+  type            PaymentType     @default(TAKSIT)
+  installmentNo   Int             @default(1) @map("installment_no")   // Taksit no
+  dueDate         DateTime        @map("due_date")           // Vade tarihi
+  amount          Float           @default(0)                // Taksit tutarı
+  paidAmount      Float           @default(0) @map("paid_amount")     // Ödenen tutar
+  paidDate        DateTime?       @map("paid_date")
+  status          PaymentStatus   @default(BEKLENIYOR)
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  sale            UnitSale        @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("payment_plans")
+}
+
+// ─── NAKİT AKIŞ KAYDI ───────────────────────────────────
+model CashFlowEntry {
+  id              String            @id @default(cuid())
+  projectId       String            @map("project_id")
+  type            CashFlowType      @default(GIRIS)
+  category        String                     // Kategori (ör: "Satış Tahsilatı", "İnşaat Maliyeti")
+  description     String?
+  amount          Float             @default(0)
+  entryDate       DateTime          @map("entry_date")
+  isProjection    Boolean           @default(false) @map("is_projection") // Projeksiyon mu gerçek mi
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  project         InvestmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("cash_flow_entries")
+}
+
+// ═══════════════════════════════════════════════════════════
+// ─── MASKOT (AI ASİSTAN) MODÜLÜ ──────────────────────────
+// ═══════════════════════════════════════════════════════════
+
+enum MascotRole {
+  MIMAR
+  MUHENDIS
+  KOORDINATOR
+}
+
+enum MascotGender {
+  KADIN
+  ERKEK
+}
+
+model Mascot {
+  id              String         @id @default(cuid())
+  name            String                    // "Ayşe Mimar", "Mehmet Mühendis"
+  role            MascotRole     @default(MIMAR)
+  gender          MascotGender   @default(KADIN)
+  personality     String         @db.Text   // Kişilik tarifi
+  avatarType      String         @default("svg") @map("avatar_type") // svg, png, emoji
+  avatarData      String?        @db.Text @map("avatar_data")        // SVG kodu veya URL
+  emoji           String         @default("👩‍🎨")
+  primaryColor    String         @default("#8B5CF6") @map("primary_color")
+  voiceLang       String         @default("tr-TR") @map("voice_lang")
+  voicePitch      Float          @default(1.0) @map("voice_pitch")
+  voiceRate       Float          @default(1.0) @map("voice_rate")
+  elevenLabsVoiceId String?      @map("elevenlabs_voice_id")   // ElevenLabs ses ID'si
+  isActive        Boolean        @default(true) @map("is_active")
+  isDefault       Boolean        @default(false) @map("is_default")
+  sortOrder       Int            @default(0) @map("sort_order")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  conversations   MascotConversation[]
+
+  @@map("mascots")
+}
+
+model MascotPromptContext {
+  id              String   @id @default(cuid())
+  key             String   @unique             // "project_info", "team_info", "rules", "custom"
+  label           String                       // Gösterim adı
+  content         String   @db.Text            // Prompt içeriği
+  isActive        Boolean  @default(true) @map("is_active")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("mascot_prompt_contexts")
+}
+
+model MascotConversation {
+  id              String   @id @default(cuid())
+  mascotId        String   @map("mascot_id")
+  userMessage     String   @db.Text @map("user_message")
+  aiResponse      String   @db.Text @map("ai_response")
+  source          String   @default("tv")      // "tv", "phone", "web"
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  mascot          Mascot   @relation(fields: [mascotId], references: [id], onDelete: Cascade)
+
+  @@map("mascot_conversations")
+}
+
+// ─── TAŞERON YÖNETİMİ ─────────────────────────────────────
+
+// Taşeron Puantaj (günlük işçi takibi)
+model TaseronPuantaj {
+  id            String   @id @default(cuid())
+  companyId     String   @map("company_id")
+  contractId    String?  @map("contract_id")
+  date          DateTime @db.Date
+  // Özet sayılar
+  toplamIsci    Int      @default(0) @map("toplam_isci")
+  toplamMesai   Float    @default(0) @map("toplam_mesai")     // saat
+  toplamDevamsiz Int     @default(0) @map("toplam_devamsiz")
+  notes         String?  @db.Text
+  createdById   String?  @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contract      HakedisContract?  @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  createdBy     User?             @relation("TaseronPuantajCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  kalemler      TaseronPuantajKalemi[]
+
+  @@unique([companyId, date])
+  @@map("taseron_puantajlar")
+}
+
+model TaseronPuantajKalemi {
+  id            String   @id @default(cuid())
+  puantajId     String   @map("puantaj_id")
+  pozisyon      String                              // Usta, Kalfa, Düz İşçi, Operatör, Teknisyen
+  sayi          Int      @default(0)                // Kişi sayısı
+  mesaiSaat     Float    @default(0) @map("mesai_saat")  // Fazla mesai (saat)
+  devamsiz      Int      @default(0)                // Devamsız sayısı
+  notes         String?
+
+  puantaj       TaseronPuantaj @relation(fields: [puantajId], references: [id], onDelete: Cascade)
+
+  @@map("taseron_puantaj_kalemleri")
+}
+
+// Taşeron Performans Değerlendirme
+model TaseronPerformans {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  contractId      String?  @map("contract_id")
+  period          String                             // "2026-Q1", "2026-01"
+  kalitePuani     Float    @default(0) @map("kalite_puani")       // 1-10
+  surePuani       Float    @default(0) @map("sure_puani")         // 1-10
+  isgPuani        Float    @default(0) @map("isg_puani")          // 1-10
+  iletisimPuani   Float    @default(0) @map("iletisim_puani")     // 1-10
+  malzemePuani    Float    @default(0) @map("malzeme_puani")      // 1-10
+  genelPuan       Float    @default(0) @map("genel_puan")         // otomatik ortalama
+  notes           String?  @db.Text
+  evaluatedById   String?  @map("evaluated_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contract        HakedisContract?  @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  evaluatedBy     User?             @relation("TaseronPerformansEvaluator", fields: [evaluatedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, contractId, period])
+  @@map("taseron_performanslar")
+}
+
+// Taşeron Kesintiler
+model TaseronKesinti {
+  id            String            @id @default(cuid())
+  companyId     String            @map("company_id")
+  contractId    String?           @map("contract_id")
+  hakedisId     String?           @map("hakedis_id")
+  type          TaseronKesintiType
+  amount        Float             @default(0)
+  description   String?
+  date          DateTime          @db.Date
+  status        TaseronKesintiStatus @default(BEKLEMEDE)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contract      HakedisContract?  @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  hakedis       Hakedis?          @relation(fields: [hakedisId], references: [id], onDelete: SetNull)
+
+  @@map("taseron_kesintiler")
+}
+
+enum TaseronKesintiType {
+  CEZAI           // Cezai kesinti
+  SGK             // SGK kesintisi
+  VERGI           // Vergi kesintisi
+  GECIKME         // Gecikme cezası
+  HASAR           // Hasar tazminatı
+  DIGER           // Diğer
+}
+
+enum TaseronKesintiStatus {
+  BEKLEMEDE       // Henüz uygulanmadı
+  UYGULANDI       // Hakediş'ten kesildi
+  IPTAL           // İptal edildi
+}
+
+// Taşeron Teminatlar
+model TaseronTeminat {
+  id            String              @id @default(cuid())
+  companyId     String              @map("company_id")
+  contractId    String?             @map("contract_id")
+  type          TaseronTeminatType
+  amount        Float               @default(0)
+  currency      String              @default("TRY")
+  bankName      String?             @map("bank_name")        // Banka adı
+  letterNo      String?             @map("letter_no")        // Teminat mektubu no
+  startDate     DateTime            @db.Date @map("start_date")
+  endDate       DateTime?           @db.Date @map("end_date")
+  status        TaseronTeminatStatus @default(AKTIF)
+  returnDate    DateTime?           @db.Date @map("return_date")   // İade tarihi
+  notes         String?             @db.Text
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contract      HakedisContract?    @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  @@map("taseron_teminatlar")
+}
+
+enum TaseronTeminatType {
+  KESIN_TEMINAT       // Kesin teminat
+  AVANS_TEMINATI      // Avans teminatı
+  EK_TEMINAT          // Ek teminat
+  NAKIT_TEMINAT       // Nakit teminat
+}
+
+enum TaseronTeminatStatus {
+  AKTIF               // Aktif teminat
+  IADE_EDILDI         // İade edildi
+  IRAD_KAYDEDILDI     // İrad kaydedildi (gelire alındı)
+  SURESI_DOLDU        // Süresi doldu
+}
+
+// Taşeron Evrak Takibi
+model TaseronEvrak {
+  id            String            @id @default(cuid())
+  companyId     String            @map("company_id")
+  type          TaseronEvrakType
+  title         String                                  // Evrak başlığı
+  description   String?                                 // Açıklama
+  issueDate     DateTime?         @db.Date @map("issue_date")   // Düzenlenme tarihi
+  expiryDate    DateTime?         @db.Date @map("expiry_date")  // Son geçerlilik tarihi
+  status        TaseronEvrakStatus @default(GECERLI)
+  reminderDays  Int               @default(30) @map("reminder_days") // Kaç gün önce uyar
+  notes         String?           @db.Text
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("taseron_evraklar")
+}
+
+enum TaseronEvrakType {
+  SGK_BORCU_YOKTUR       // SGK borcu yoktur belgesi
+  VERGI_BORCU_YOKTUR     // Vergi borcu yoktur belgesi
+  ISG_BELGESI            // İSG belgesi
+  SIGORTA_POLICESI       // Sigorta poliçesi
+  IMZA_SIRKULERI         // İmza sirküleri
+  TICARET_SICIL          // Ticaret sicil gazetesi
+  FAALIYET_BELGESI       // Faaliyet belgesi
+  YETKI_BELGESI          // Yetki belgesi
+  DIGER                  // Diğer
+}
+
+enum TaseronEvrakStatus {
+  GECERLI          // Geçerli
+  SURESI_DOLDU     // Süresi doldu
+  SURESI_YAKLASTI  // Süresi yaklaşıyor
+  BEKLEMEDE        // Beklemede
+}
+
+// ─── SUNUM (Presentation / Slideshow) ────────────────────
+model Presentation {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  mode        PresentationMode @default(SLIDE)
+  interval    Int      @default(5)        // Slayt geçiş süresi (saniye)
+  transition  String   @default("fade")   // fade, slide, zoom, kenburns, flip, blur, wipe
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+
+  // Overlay ayarları
+  logoUrl       String?  @db.Text @map("logo_url")        // Sol üst firma logosu (base64)
+  showClock     Boolean  @default(false) @map("show_clock")  // Sağ üst canlı saat
+  tickerText    String?  @db.Text @map("ticker_text")       // Alt kayan yazı metni
+  tickerSpeed   Int      @default(30) @map("ticker_speed")   // Kayan yazı hızı (px/sn)
+  showProgress  Boolean  @default(false) @map("show_progress") // Alt ilerleme çubuğu
+
+  // Sayaç overlay
+  countdownTimerId String?         @map("countdown_timer_id")
+  countdownTimer   CountdownTimer? @relation(fields: [countdownTimerId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  slides      PresentationSlide[]
+
+  @@map("presentations")
+}
+
+model PresentationSlide {
+  id             Int          @id @default(autoincrement())
+  presentationId Int          @map("presentation_id")
+  imageUrl       String       @db.Text @map("image_url")
+  fileName       String?      @map("file_name")
+  caption        String?                                     // Slayt başlığı/açıklaması
+  sortOrder      Int          @default(0) @map("sort_order")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  presentation   Presentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+
+  @@map("presentation_slides")
+}
+
+enum PresentationMode {
+  SLIDE     // Tek tek slayt gösterimi
+  GRID_2    // 2'li ızgara
+  GRID_3    // 3'lü ızgara
+  GRID_4    // 4'lü ızgara
+  GRID_6    // 6'lı ızgara
+}
+
+// ─── TEKLİF & İHALE YÖNETİMİ ────────────────────────────
+
+// İnşaat Disiplinleri (Teklif Modülü)
+model TeklifDiscipline {
+  id          String   @id @default(cuid())
+  code        String   @unique                 // "01", "02", ...
+  name        String                           // "Kaba İnşaat", "İnce İnşaat"
+  color       String   @default("#3b82f6")     // Renk kodu
+  icon        String   @default("Hammer")      // Lucide icon adı
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  categories  PozCategory[]
+  tenderItems TenderItem[]
+
+  @@map("teklif_disciplines")
+}
+
+// Poz Kategori Ağacı (Disiplin → Kategori → Alt Kategori)
+model PozCategory {
+  id           String   @id @default(cuid())
+  disciplineId String   @map("discipline_id")
+  parentId     String?  @map("parent_id")
+  code         String                          // "01.01", "01.01.01"
+  name         String                          // "Betonarme", "Kalıp İşleri"
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  discipline   TeklifDiscipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  parent       PozCategory?     @relation("PozCategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children     PozCategory[] @relation("PozCategoryTree")
+  pozItems     PozItem[]
+
+  @@map("poz_categories")
+}
+
+// Poz Kalemleri (Birim Fiyat Listesi)
+model PozItem {
+  id            String   @id @default(cuid())
+  categoryId    String   @map("category_id")
+  code          String                         // "01.01.001"
+  description   String   @db.Text              // "Düz yüzey ahşap kalıp yapılması"
+  unit          String                         // "m²", "m³", "kg", "adet", "mt"
+  laborCost     Float    @default(0) @map("labor_cost")       // İşçilik
+  materialCost  Float    @default(0) @map("material_cost")    // Malzeme
+  equipmentCost Float    @default(0) @map("equipment_cost")   // Ekipman
+  unitPrice     Float    @default(0) @map("unit_price")       // Toplam birim fiyat
+  source        String   @default("custom")                   // "custom", "csb", "market"
+  year          Int      @default(2026)                       // Fiyat yılı
+  notes         String?  @db.Text
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  category      PozCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tenderItems   TenderItem[]
+
+  @@map("poz_items")
+}
+
+// İhale / Teklif
+model Tender {
+  id           String       @id @default(cuid())
+  projectId    String?      @map("project_id")
+  name         String                          // "Merkez Konut İnşaat İhalesi"
+  employer     String?                         // İşveren/Firma
+  location     String?                         // Şantiye Lokasyonu
+  dueDate      DateTime?    @map("due_date")   // Son teklif tarihi
+  startDate    DateTime?    @map("start_date") // İşe başlama tarihi
+  duration     Int?                            // İş süresi (gün)
+  status       TenderStatus @default(DRAFT)
+  type         TenderType   @default(CLOSED)
+  currency     String       @default("TRY")
+  notes        String?      @db.Text
+  isArchived   Boolean      @default(false) @map("is_archived")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  versions     TenderVersion[]
+  comparisons  TenderComparison[]
+
+  @@map("tenders")
+}
+
+enum TenderStatus {
+  DRAFT          // Taslak
+  PREPARING      // Hazırlanıyor
+  SUBMITTED      // Teklif Verildi
+  WON            // Kazanıldı
+  LOST           // Kaybedildi
+  CANCELLED      // İptal
+}
+
+enum TenderType {
+  OPEN           // Açık İhale
+  CLOSED         // Kapalı Teklif
+  NEGOTIATED     // Pazarlık
+  DIRECT         // Doğrudan Temin
+}
+
+// Teklif Versiyonları (Revizyon Takibi)
+model TenderVersion {
+  id           String   @id @default(cuid())
+  tenderId     String   @map("tender_id")
+  versionNo    Int      @default(1) @map("version_no")
+  name         String?                         // "Rev.1", "Final Teklif"
+  totalCost    Float    @default(0) @map("total_cost")       // Toplam maliyet
+  markup       Float    @default(0)                          // Kar oranı (%)
+  overhead     Float    @default(0)                          // Genel gider (%)
+  totalPrice   Float    @default(0) @map("total_price")     // Teklif fiyatı
+  notes        String?  @db.Text
+  isActive     Boolean  @default(true) @map("is_active")    // Aktif versiyon
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tender       Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  items        TenderItem[]
+
+  @@map("tender_versions")
+}
+
+// Teklif Kalemleri (Keşif/Metraj Satırları)
+model TenderItem {
+  id           String   @id @default(cuid())
+  versionId    String   @map("version_id")
+  disciplineId String?  @map("discipline_id")
+  pozItemId    String?  @map("poz_item_id")
+
+  // Hiyerarşi & Gruplama
+  groupCode    String?  @map("group_code")     // "A", "B", "C" vb.
+  groupName    String?  @map("group_name")     // Ana grup adı (MİMARİ İŞLER)
+  subGroupName String?  @map("sub_group_name") // Alt grup / bölüm adı
+  itemNumber   String?  @map("item_number")    // Hiyerarşik sıra no: "1", "1.1", "1.2"
+  level        Int      @default(2)            // 0=Grup, 1=Bölüm, 2=Kalem
+
+  pozCode      String?  @map("poz_code")       // Poz numarası
+  description  String   @db.Text               // İşin Cinsi
+  detail       String?  @db.Text               // İşin Detayı
+  contractorNote String? @db.Text @map("contractor_note") // Yüklenici Açıklama
+  unit         String   @default("")           // Birim
+  quantity     Float    @default(0)            // Miktar (Metraj)
+  unitPrice    Float    @default(0) @map("unit_price")      // Toplam Birim Fiyat
+  totalPrice   Float    @default(0) @map("total_price")     // Toplam Tutar
+  laborCost    Float    @default(0) @map("labor_cost")      // İşçilik Birim Fiyat
+  materialCost Float    @default(0) @map("material_cost")   // Malzeme Birim Fiyat
+  equipmentCost Float   @default(0) @map("equipment_cost")  // Ekipman BF
+
+  // İthalat / Yerel Dağılım
+  importPercent Float   @default(0) @map("import_percent")  // İthalat %
+  importAmount  Float   @default(0) @map("import_amount")   // İthalat Tutarı
+  localPercent  Float   @default(0) @map("local_percent")   // Yerel %
+  localAmount   Float   @default(0) @map("local_amount")    // Yerel Tutar
+
+  sortOrder    Int      @default(0) @map("sort_order")
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  version      TenderVersion    @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  discipline   TeklifDiscipline? @relation(fields: [disciplineId], references: [id], onDelete: SetNull)
+  pozItem      PozItem?         @relation(fields: [pozItemId], references: [id], onDelete: SetNull)
+
+  @@map("tender_items")
+}
+
+// Rakip Karşılaştırma
+model TenderComparison {
+  id             String   @id @default(cuid())
+  tenderId       String   @map("tender_id")
+  competitorName String   @map("competitor_name")
+  totalPrice     Float    @default(0) @map("total_price")
+  currency       String   @default("TRY")
+  notes          String?  @db.Text
+  rank           Int?                          // Sıralama
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tender         Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@map("tender_comparisons")
+}
+
+// Excel Import Sütun Eşleme Hafızası
+model ImportMapping {
+  id         String   @id @default(cuid())
+  name       String                           // "ABC Firması Keşif Formatı"
+  columnMap  String   @db.Text @map("column_map")  // JSON: { pozNo: "A", desc: "C", ... }
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("import_mappings")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ══════ TOPLANTI TUTANAKLARI (MEETING MINUTES) ════════════════
+// ═══════════════════════════════════════════════════════════════
+
+enum MeetingType {
+  ISVEREN        // İşveren Toplantısı
+  TASERON        // Taşeron Toplantısı
+  KOORDINASYON   // Koordinasyon Toplantısı
+  ISG            // İSG Toplantısı
+  TEKNIK         // Teknik Toplantı
+  HAFTALIK       // Haftalık İlerleme
+  DIGER          // Diğer
+}
+
+enum MeetingStatus {
+  PLANNED        // Planlandı
+  IN_PROGRESS    // Devam Ediyor
+  COMPLETED      // Tamamlandı
+  CANCELLED      // İptal
+}
+
+// Toplantı Tutanağı
+model Meeting {
+  id           String        @id @default(cuid())
+  projectId    String?       @map("project_id")
+  title        String                              // Toplantı başlığı
+  meetingNo    Int           @default(1) @map("meeting_no")
+  type         MeetingType   @default(KOORDINASYON)
+  status       MeetingStatus @default(PLANNED)
+  date         DateTime      @default(now())        // Toplantı tarihi
+  location     String?                              // Toplantı yeri
+  startTime    String?       @map("start_time")     // HH:mm
+  endTime      String?       @map("end_time")       // HH:mm
+  notes        String?       @db.Text               // Genel notlar
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  participants MeetingParticipant[]
+  columns      MeetingColumn[]
+  items        MeetingItem[]
+
+  @@map("meetings")
+}
+
+// Toplantı Katılımcıları
+model MeetingParticipant {
+  id         String  @id @default(cuid())
+  meetingId  String  @map("meeting_id")
+  name       String                        // Katılımcı adı
+  company    String?                       // Firma adı
+  role       String?                       // Görevi
+  email      String?
+  phone      String?
+  isPresent  Boolean @default(true) @map("is_present")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  meeting    Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@map("meeting_participants")
+}
+
+// Dinamik Sütun Tanımları
+model MeetingColumn {
+  id         String  @id @default(cuid())
+  meetingId  String  @map("meeting_id")
+  name       String                        // Sütun adı
+  type       String  @default("text")       // text, checkbox, date, select
+  sortOrder  Int     @default(0) @map("sort_order")
+  width      Int?                           // Piksel genişliği
+  options    String? @db.Text               // JSON: select seçenekleri
+  isRequired Boolean @default(false) @map("is_required")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  meeting    Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  values     MeetingItemValue[]
+
+  @@map("meeting_columns")
+}
+
+// Toplantı Maddeleri (Satırlar)
+model MeetingItem {
+  id          String    @id @default(cuid())
+  meetingId   String    @map("meeting_id")
+  rowNumber   Int       @map("row_number")
+  isCompleted Boolean   @default(false) @map("is_completed")
+  completedAt DateTime? @map("completed_at")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  meeting     Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  values      MeetingItemValue[]
+  comments    MeetingComment[]
+
+  @@map("meeting_items")
+}
+
+// Hücre Değerleri (Satır × Sütun)
+model MeetingItemValue {
+  id        String @id @default(cuid())
+  itemId    String @map("item_id")
+  columnId  String @map("column_id")
+  value     String @default("") @db.Text
+
+  item      MeetingItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  column    MeetingColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, columnId])
+  @@map("meeting_item_values")
+}
+
+// Madde Yorumları
+model MeetingComment {
+  id        String   @id @default(cuid())
+  itemId    String   @map("item_id")
+  userId    String?  @map("user_id")
+  author    String                        // Yazar adı
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  item      MeetingItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("meeting_comments")
 }

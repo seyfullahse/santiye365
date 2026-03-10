@@ -7,6 +7,8 @@ export async function GET(req: NextRequest) {
   const endDate = req.nextUrl.searchParams.get("endDate");
   const teamId = req.nextUrl.searchParams.get("teamId");
   const companyId = req.nextUrl.searchParams.get("companyId");
+  const companyType = req.nextUrl.searchParams.get("companyType"); // MAIN | SUBCONTRACTOR | all
+  const projectId = req.nextUrl.searchParams.get("projectId");
   const shift = req.nextUrl.searchParams.get("shift"); // DAY | NIGHT | all
 
   if (!date) {
@@ -25,13 +27,16 @@ export async function GET(req: NextRequest) {
     // Çalışanları getir (filtrelere göre)
     const workers = await prisma.worker.findMany({
       where: {
+        isActive: true,
         ...(teamId ? { teamId } : {}),
         ...(companyId ? { team: { companyId } } : {}),
+        ...(companyType && companyType !== "all" ? { team: { company: { type: companyType as "MAIN" | "SUBCONTRACTOR" | "MANAGEMENT" } } } : {}),
+        ...(projectId ? { team: { projectId } } : {}),
       },
       include: {
         team: {
           include: {
-            company: { select: { id: true, name: true, sortOrder: true } },
+            company: { select: { id: true, name: true, type: true, sortOrder: true } },
             discipline: { select: { name: true } },
           },
         },

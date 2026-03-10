@@ -18,6 +18,9 @@ import {
   Check,
   ArrowLeft,
   Home,
+  MessageSquare,
+  Settings,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -36,37 +39,70 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-// ─── Motive edici ve eğlenceli yazılar ───
-const motivationalMessages = [
-  { text: "Her tuğla bir zafer, her kat bir efsane! 🧱", icon: Trophy },
-  { text: "İşveren geldiğinde çenesi yere düşecek! 😎", icon: Rocket },
-  { text: "Bu şantiyede imkansız diye bir şey yok! 💪", icon: Flame },
-  { text: "Takım çalışması = Süper güç! 🦸‍♂️", icon: Zap },
-  { text: "Hedefe kilitlen, gerisini bırak! 🎯", icon: Target },
-  { text: "Molada çay içmeyi unutmayın! ☕", icon: Clock },
-  { text: "Patron gülerse, herkes güler! 😄", icon: PartyPopper },
-  { text: "Bugün de harikalar yaratıyoruz! ✨", icon: Flame },
-  { text: "Şantiyenin yıldızları iş başında! ⭐", icon: Trophy },
-  { text: "Hız kesmeyin, zirve yakın! 🏔️", icon: Rocket },
-  { text: "Bu tempo ile erken bile bitiririz! 🚀", icon: Rocket },
-  { text: "Kalite bizim işimiz, hız bizim tutkumuz! 🔥", icon: Flame },
-  { text: "Her gün bir adım daha yakınız! 👣", icon: Target },
-  { text: "Usta işi, göz nuru! 👁️", icon: Trophy },
-  { text: "Demir gibi irade, çelik gibi takım! 🦾", icon: Zap },
-  { text: "Salı günü geldiğinde gururla göstereceğiz! 🏆", icon: Trophy },
-  { text: "Beton kurumadan biz bitiriyoruz! 💨", icon: Rocket },
-  { text: "Şantiye360 ekibi durdurulamaz! 🔱", icon: Zap },
-  { text: "Azim + Emek = Başarı 📐", icon: Target },
-  { text: "Bir vinç kaldıramaz ama takım her şeyi kaldırır! 🏗️", icon: Flame },
+// ─── İkon haritası (DB'den string → component) ───
+const iconMap: Record<string, LucideIcon> = {
+  Trophy,
+  Rocket,
+  Flame,
+  Zap,
+  Target,
+  Clock,
+  PartyPopper,
+  Timer,
+  MessageSquare,
+};
+const iconOptions = Object.keys(iconMap);
+
+function getIcon(name: string): LucideIcon {
+  return iconMap[name] || Zap;
+}
+
+interface SayacMsg {
+  id?: string;
+  text: string;
+  icon: string;
+  type: string;
+}
+
+// ─── Varsayılan mesajlar (DB boşsa fallback) ───
+const defaultActiveMessages: SayacMsg[] = [
+  { text: "Her tuğla bir zafer, her kat bir efsane! 🧱", icon: "Trophy", type: "active" },
+  { text: "İşveren geldiğinde çenesi yere düşecek! 😎", icon: "Rocket", type: "active" },
+  { text: "Bu şantiyede imkansız diye bir şey yok! 💪", icon: "Flame", type: "active" },
+  { text: "Takım çalışması = Süper güç! 🦸‍♂️", icon: "Zap", type: "active" },
+  { text: "Hedefe kilitlen, gerisini bırak! 🎯", icon: "Target", type: "active" },
+  { text: "Molada çay içmeyi unutmayın! ☕", icon: "Clock", type: "active" },
+  { text: "Patron gülerse, herkes güler! 😄", icon: "PartyPopper", type: "active" },
+  { text: "Bugün de harikalar yaratıyoruz! ✨", icon: "Flame", type: "active" },
+  { text: "Şantiyenin yıldızları iş başında! ⭐", icon: "Trophy", type: "active" },
+  { text: "Hız kesmeyin, zirve yakın! 🏔️", icon: "Rocket", type: "active" },
+  { text: "Bu tempo ile erken bile bitiririz! 🚀", icon: "Rocket", type: "active" },
+  { text: "Kalite bizim işimiz, hız bizim tutkumuz! 🔥", icon: "Flame", type: "active" },
+  { text: "Her gün bir adım daha yakınız! 👣", icon: "Target", type: "active" },
+  { text: "Usta işi, göz nuru! 👁️", icon: "Trophy", type: "active" },
+  { text: "Demir gibi irade, çelik gibi takım! 🦾", icon: "Zap", type: "active" },
+  { text: "Salı günü geldiğinde gururla göstereceğiz! 🏆", icon: "Trophy", type: "active" },
+  { text: "Beton kurumadan biz bitiriyoruz! 💨", icon: "Rocket", type: "active" },
+  { text: "Şantiye360 ekibi durdurulamaz! 🔱", icon: "Zap", type: "active" },
+  { text: "Azim + Emek = Başarı 📐", icon: "Target", type: "active" },
+  { text: "Bir vinç kaldıramaz ama takım her şeyi kaldırır! 🏗️", icon: "Flame", type: "active" },
+  { text: "Müdürümm revize gelirse ekranı kapatıp kaçıyoruz! 😂", icon: "Zap", type: "active" },
 ];
 
-const expiredMessages = [
-  { text: "Süre doldu! Ama biz zaten bitirmiştik, değil mi? 😏", icon: Trophy },
-  { text: "Zaman dolmuş ama kalite asla bitmez! 🏅", icon: PartyPopper },
-  { text: "İşveren şimdi gelsin, hazırız! 🎉", icon: PartyPopper },
-  { text: "Şantiyenin şampiyonları görev tamamladı! 🥇", icon: Trophy },
-  { text: "Yeni hedef koymanın zamanı geldi! 🎯", icon: Rocket },
+const defaultExpiredMessages: SayacMsg[] = [
+  { text: "Süre doldu! Ama biz zaten bitirmiştik, değil mi? 😏", icon: "Trophy", type: "expired" },
+  { text: "Zaman dolmuş ama kalite asla bitmez! 🏅", icon: "PartyPopper", type: "expired" },
+  { text: "İşveren şimdi gelsin, hazırız! 🎉", icon: "PartyPopper", type: "expired" },
+  { text: "Şantiyenin şampiyonları görev tamamladı! 🥇", icon: "Trophy", type: "expired" },
+  { text: "Yeni hedef koymanın zamanı geldi! 🎯", icon: "Rocket", type: "expired" },
 ];
 
 const emojiOptions = ["🏗️", "🚀", "🔥", "⭐", "🎯", "💪", "🏆", "⚡", "🏠", "🔨", "🧱", "🪜"];
@@ -107,21 +143,27 @@ function CountdownCard({
   onEdit,
   onDelete,
   isHighlighted,
+  activeMessages,
+  expiredMsgs,
 }: {
   timer: CountdownTimer;
   onEdit: (t: CountdownTimer) => void;
   onDelete: (id: string) => void;
   isHighlighted: boolean;
+  activeMessages: SayacMsg[];
+  expiredMsgs: SayacMsg[];
 }) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>(getTimeLeft(timer.targetDate));
   const [msgIndex, setMsgIndex] = useState(0);
   const [animateDigit, setAnimateDigit] = useState<string | null>(null);
   const prevSeconds = useRef(timeLeft.seconds);
+  const isExpiredRef = useRef(timeLeft.total <= 0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const tl = getTimeLeft(timer.targetDate);
       setTimeLeft(tl);
+      isExpiredRef.current = tl.total <= 0;
       if (tl.seconds !== prevSeconds.current) {
         setAnimateDigit("seconds");
         prevSeconds.current = tl.seconds;
@@ -133,19 +175,19 @@ function CountdownCard({
 
   // Mesajları 8 saniyede bir değiştir
   useEffect(() => {
-    const messages = timeLeft.total <= 0 ? expiredMessages : motivationalMessages;
     const msgInterval = setInterval(() => {
-      setMsgIndex((prev) => (prev + 1) % messages.length);
+      const msgs = isExpiredRef.current ? expiredMsgs : activeMessages;
+      setMsgIndex((prev) => (prev + 1) % msgs.length);
     }, 8000);
     return () => clearInterval(msgInterval);
-  }, [timeLeft.total]);
+  }, [activeMessages, expiredMsgs]);
 
   const isExpired = timeLeft.total <= 0;
   const isUrgent = !isExpired && timeLeft.days === 0 && timeLeft.hours < 6;
   const isToday = !isExpired && timeLeft.days === 0;
-  const messages = isExpired ? expiredMessages : motivationalMessages;
+  const messages = isExpired ? expiredMsgs : activeMessages;
   const currentMsg = messages[msgIndex % messages.length];
-  const MsgIcon = currentMsg.icon;
+  const MsgIcon = getIcon(currentMsg?.icon || "Zap");
 
   const targetDateFormatted = new Date(timer.targetDate).toLocaleDateString("tr-TR", {
     weekday: "long",
@@ -283,6 +325,7 @@ function CountdownCard({
         )}
 
         {/* Motive edici yazı */}
+        {currentMsg && (
         <div
           className={`mt-6 text-center transition-all duration-700 ease-in-out`}
           key={msgIndex}
@@ -292,6 +335,7 @@ function CountdownCard({
             <span className="text-sm sm:text-base font-medium">{currentMsg.text}</span>
           </div>
         </div>
+        )}
       </CardContent>
 
       {/* Bottom pulse line for urgent */}
@@ -318,6 +362,38 @@ export default function SayacPage() {
   const [formEmoji, setFormEmoji] = useState("🏗️");
   const [saving, setSaving] = useState(false);
 
+  // ─── Mesaj yönetimi state ───
+  const [activeMessages, setActiveMessages] = useState<SayacMsg[]>(defaultActiveMessages);
+  const [expiredMsgs, setExpiredMsgs] = useState<SayacMsg[]>(defaultExpiredMessages);
+  const [showMsgDialog, setShowMsgDialog] = useState(false);
+  const [allMessages, setAllMessages] = useState<SayacMsg[]>([]);
+  const [msgFilter, setMsgFilter] = useState<"active" | "expired">("active");
+  const [newMsgText, setNewMsgText] = useState("");
+  const [newMsgIcon, setNewMsgIcon] = useState("Zap");
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editMsgText, setEditMsgText] = useState("");
+  const [editMsgIcon, setEditMsgIcon] = useState("Zap");
+  const [savingMsg, setSavingMsg] = useState(false);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await fetch("/api/sayac-mesajlar");
+      if (res.ok) {
+        const data: SayacMsg[] = await res.json();
+        if (data.length > 0) {
+          const active = data.filter((m) => m.type === "active");
+          const expired = data.filter((m) => m.type === "expired");
+          if (active.length > 0) setActiveMessages(active);
+          if (expired.length > 0) setExpiredMsgs(expired);
+          setAllMessages(data);
+        }
+      }
+    } catch {
+      // Fallback varsayılanlar zaten set
+    }
+  }, []);
+
+
   const fetchTimers = useCallback(async () => {
     try {
       const res = await fetch("/api/sayac");
@@ -334,7 +410,8 @@ export default function SayacPage() {
 
   useEffect(() => {
     fetchTimers();
-  }, [fetchTimers]);
+    fetchMessages();
+  }, [fetchTimers, fetchMessages]);
 
   // Bir sonraki salıyı hesapla (varsayılan)
   const getNextTuesday = () => {
@@ -460,9 +537,14 @@ export default function SayacPage() {
             </p>
           </div>
         </div>
-        <Button onClick={openCreateDialog} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-          <Plus className="h-4 w-4 mr-2" /> Yeni Sayaç
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowMsgDialog(true)}>
+            <MessageSquare className="h-4 w-4 mr-2" /> Mesajları Yönet
+          </Button>
+          <Button onClick={openCreateDialog} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+            <Plus className="h-4 w-4 mr-2" /> Yeni Sayaç
+          </Button>
+        </div>
       </div>
 
       {/* Yükleniyor */}
@@ -517,6 +599,8 @@ export default function SayacPage() {
               onEdit={openEditDialog}
               onDelete={handleDelete}
               isHighlighted={highlightedId === timer.id}
+              activeMessages={activeMessages}
+              expiredMsgs={expiredMsgs}
             />
           ))}
         </div>
@@ -535,6 +619,8 @@ export default function SayacPage() {
               onEdit={openEditDialog}
               onDelete={handleDelete}
               isHighlighted={highlightedId === timer.id}
+              activeMessages={activeMessages}
+              expiredMsgs={expiredMsgs}
             />
           ))}
         </div>
@@ -551,6 +637,8 @@ export default function SayacPage() {
                 onEdit={openEditDialog}
                 onDelete={handleDelete}
                 isHighlighted={false}
+                activeMessages={activeMessages}
+                expiredMsgs={expiredMsgs}
               />
             </div>
           ))}
@@ -682,6 +770,250 @@ export default function SayacPage() {
                 {editingTimer ? "Güncelle" : "Oluştur"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Mesaj Yönetimi Dialog ─── */}
+      <Dialog open={showMsgDialog} onOpenChange={setShowMsgDialog}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" /> Motivasyon Mesajlarını Yönet
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            {/* Filtre */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant={msgFilter === "active" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMsgFilter("active")}
+              >
+                <Rocket className="h-3.5 w-3.5 mr-1" /> Aktif Mesajlar
+              </Button>
+              <Button
+                variant={msgFilter === "expired" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMsgFilter("expired")}
+              >
+                <Trophy className="h-3.5 w-3.5 mr-1" /> Süre Dolmuş
+              </Button>
+            </div>
+
+            {/* Yeni mesaj ekle */}
+            <div className="flex items-end gap-2 p-3 rounded-lg border bg-muted/30">
+              <div className="flex-1">
+                <Label className="text-xs font-medium">Yeni Mesaj</Label>
+                <Input
+                  value={newMsgText}
+                  onChange={(e) => setNewMsgText(e.target.value)}
+                  placeholder="Mesaj yazın... (emoji ekleyebilirsiniz 🚀)"
+                  className="mt-1"
+                />
+              </div>
+              <div className="w-32">
+                <Label className="text-xs font-medium">İkon</Label>
+                <Select value={newMsgIcon} onValueChange={setNewMsgIcon}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {iconOptions.map((ic) => {
+                      const IC = iconMap[ic];
+                      return (
+                        <SelectItem key={ic} value={ic}>
+                          <span className="flex items-center gap-2">
+                            <IC className="h-4 w-4" /> {ic}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                size="sm"
+                disabled={!newMsgText.trim() || savingMsg}
+                onClick={async () => {
+                  setSavingMsg(true);
+                  try {
+                    const res = await fetch("/api/sayac-mesajlar", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ text: newMsgText.trim(), icon: newMsgIcon, type: msgFilter }),
+                    });
+                    if (!res.ok) throw new Error();
+                    toast.success("Mesaj eklendi! ✨");
+                    setNewMsgText("");
+                    fetchMessages();
+                  } catch {
+                    toast.error("Mesaj eklenemedi");
+                  } finally {
+                    setSavingMsg(false);
+                  }
+                }}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Mesaj listesi */}
+            <div className="space-y-2">
+              {(allMessages.length > 0
+                ? allMessages.filter((m) => m.type === msgFilter)
+                : (msgFilter === "active" ? defaultActiveMessages : defaultExpiredMessages).map((m, i) => ({ ...m, id: `default-${i}`, type: msgFilter }))
+              ).map((msg) => {
+                const MIcon = getIcon(msg.icon);
+                const isDefault = !msg.id || msg.id?.startsWith("default-");
+                const isEditing = editingMsgId === msg.id;
+
+                return (
+                  <div
+                    key={msg.id || msg.text}
+                    className="flex items-center gap-2 p-3 rounded-lg border bg-background hover:bg-muted/30 transition-colors group"
+                  >
+                    <MIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    {isEditing ? (
+                      <>
+                        <Input
+                          value={editMsgText}
+                          onChange={(e) => setEditMsgText(e.target.value)}
+                          className="flex-1 h-8 text-sm"
+                        />
+                        <Select value={editMsgIcon} onValueChange={setEditMsgIcon}>
+                          <SelectTrigger className="w-24 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {iconOptions.map((ic) => {
+                              const IC = iconMap[ic];
+                              return (
+                                <SelectItem key={ic} value={ic}>
+                                  <span className="flex items-center gap-1">
+                                    <IC className="h-3 w-3" /> {ic}
+                                  </span>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={async () => {
+                            setSavingMsg(true);
+                            try {
+                              const res = await fetch(`/api/sayac-mesajlar/${msg.id}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ text: editMsgText, icon: editMsgIcon }),
+                              });
+                              if (!res.ok) throw new Error();
+                              toast.success("Mesaj güncellendi ✅");
+                              setEditingMsgId(null);
+                              fetchMessages();
+                            } catch {
+                              toast.error("Güncellenemedi");
+                            } finally {
+                              setSavingMsg(false);
+                            }
+                          }}
+                        >
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setEditingMsgId(null)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm">{msg.text}</span>
+                        {isDefault ? (
+                          <Badge variant="secondary" className="text-xs">Varsayılan</Badge>
+                        ) : (
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                setEditingMsgId(msg.id!);
+                                setEditMsgText(msg.text);
+                                setEditMsgIcon(msg.icon);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={async () => {
+                                if (!confirm("Bu mesajı silmek istediğinize emin misiniz?")) return;
+                                try {
+                                  const res = await fetch(`/api/sayac-mesajlar/${msg.id}`, { method: "DELETE" });
+                                  if (!res.ok) throw new Error();
+                                  toast.success("Mesaj silindi");
+                                  fetchMessages();
+                                } catch {
+                                  toast.error("Silinemedi");
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Varsayılanları yükle butonu */}
+            {allMessages.filter((m) => m.type === msgFilter).length === 0 && (
+              <div className="text-center pt-2">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Veritabanında mesaj yok. Varsayılan mesajlar gösteriliyor.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={savingMsg}
+                  onClick={async () => {
+                    setSavingMsg(true);
+                    try {
+                      const defaults = msgFilter === "active" ? defaultActiveMessages : defaultExpiredMessages;
+                      for (const msg of defaults) {
+                        await fetch("/api/sayac-mesajlar", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ text: msg.text, icon: msg.icon, type: msgFilter }),
+                        });
+                      }
+                      toast.success(`${defaults.length} mesaj veritabanına yüklendi! 🎉`);
+                      fetchMessages();
+                    } catch {
+                      toast.error("Mesajlar yüklenemedi");
+                    } finally {
+                      setSavingMsg(false);
+                    }
+                  }}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  {savingMsg ? "Yükleniyor..." : "Varsayılanları Veritabanına Yükle"}
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

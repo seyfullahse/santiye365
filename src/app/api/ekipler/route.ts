@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const teams = await prisma.team.findMany({
       include: {
-        company: { select: { id: true, name: true, sortOrder: true } },
+        company: { select: { id: true, name: true, type: true, sortOrder: true } },
         discipline: { select: { name: true } },
       },
       orderBy: [{ company: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }],

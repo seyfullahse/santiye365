@@ -16,11 +16,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        const user = await prisma.user.findUnique({
+        const user = await (prisma.user as any).findUnique({
           where: { email: credentials.email as string },
         });
 
         if (!user) return null;
+
+        // Pasif hesapı engelle
+        if (user.isActive === false) return null;
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password as string,
@@ -28,6 +31,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
 
         if (!isPasswordValid) return null;
+
+        // Son giriş zamanını güncelle (asenkron, bekleme yok)
+        (prisma.user as any).update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        }).catch(() => {});
 
         return {
           id: user.id,
@@ -39,10 +48,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.role = user.role;
         token.id = user.id as string;
+      }
+      // Her token yenilenmesinde DB'den güncel rolü al
+      if (token.id && !user) {
+        try {
+          const dbUser = await (prisma.user as any).findUnique({
+            where: { id: token.id as string },
+            select: { role: true, name: true, isActive: true },
+          });
+          if (dbUser) {
+            token.role = dbUser.role;
+            token.name = dbUser.name;
+            if (dbUser.isActive === false) return {} as any; // Pasif hesabı düşür
+          }
+        } catch {}
       }
       return token;
     },

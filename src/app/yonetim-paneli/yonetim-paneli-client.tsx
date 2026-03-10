@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import {
   TrendingUp,
   TrendingDown,
@@ -524,21 +524,14 @@ function AiInsightCard({ insight }: { insight: (typeof aiInsights)[0] }) {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 
-export default function YonetimPaneliClient() {
-  const { data: session } = useSession();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [dateStr, setDateStr] = useState("");
+interface YonetimPaneliProps {
+  userName: string;
+  userEmail: string;
+  dateStr: string;
+}
 
-  useEffect(() => {
-    setDateStr(
-      new Date().toLocaleDateString("tr-TR", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    );
-  }, []);
+export default function YonetimPaneliClient({ userName, userEmail, dateStr }: YonetimPaneliProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="flex-1">
@@ -575,15 +568,15 @@ export default function YonetimPaneliClient() {
               <div className="hidden sm:flex items-center gap-2">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="text-xs">
-                    {session?.user?.name?.charAt(0) ?? "U"}
+                    {userName.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden md:block">
                   <p className="text-sm font-medium leading-tight">
-                    {session?.user?.name ?? "Kullanıcı"}
+                    {userName}
                   </p>
                   <p className="text-[11px] text-muted-foreground leading-tight">
-                    {session?.user?.email ?? ""}
+                    {userEmail}
                   </p>
                 </div>
                 <Button
@@ -660,10 +653,10 @@ export default function YonetimPaneliClient() {
               <div className="flex items-center gap-2 px-3 py-2">
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="text-xs">
-                    {session?.user?.name?.charAt(0) ?? "U"}
+                    {userName.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-sm font-medium flex-1">{session?.user?.name ?? "Kullanıcı"}</span>
+                <span className="text-sm font-medium flex-1">{userName}</span>
                 <Button
                   variant="ghost"
                   size="sm"

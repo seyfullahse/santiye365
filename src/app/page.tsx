@@ -36,6 +36,7 @@ export default async function HomePage() {
     <AnasayfaClient
       userName={session.user?.name ?? "Kullanıcı"}
       userEmail={session.user?.email ?? ""}
+      userRole={session.user?.role ?? "USER"}
       kpiData={{
         activeProjects,
         totalWorkers,

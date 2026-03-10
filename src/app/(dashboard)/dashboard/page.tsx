@@ -148,6 +148,59 @@ async function getDashboardData(projectId?: string) {
     select: { id: true, name: true, status: true },
   });
 
+  // ─── PUANTAJ VERİLERİ ─────────────────────────────────────
+  const puantajActiveWorkers = await prisma.worker.count({ where: { isActive: true } });
+  const puantajTotalWorkers = await prisma.worker.count();
+
+  // Bugünkü yoklama
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayStartUTC = new Date(todayStart.toISOString().slice(0, 10) + "T00:00:00.000Z");
+  const todayAttendances = await prisma.attendance.findMany({
+    where: { date: todayStartUTC },
+    select: { status: true },
+  });
+  let puantajPresent = 0;
+  let puantajAbsent = 0;
+  let puantajLeave = 0;
+  for (const att of todayAttendances) {
+    if (att.status === "PRESENT" || att.status === "HALF_DAY") puantajPresent++;
+    else if (att.status === "ABSENT") puantajAbsent++;
+    else puantajLeave++;
+  }
+
+  // Aylık toplam saat
+  const puantajMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const puantajMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const puantajMonthStartUTC = new Date(puantajMonthStart.toISOString().slice(0, 10) + "T00:00:00.000Z");
+  const puantajMonthEndUTC = new Date(puantajMonthEnd.toISOString().slice(0, 10) + "T00:00:00.000Z");
+  const puantajMonthAgg = await prisma.attendance.aggregate({
+    where: { date: { gte: puantajMonthStartUTC, lte: puantajMonthEndUTC } },
+    _sum: { totalHours: true, overtime: true },
+  });
+
+  // Bekleyen izin talepleri
+  const puantajPendingLeaves = await prisma.workerLeave.count({
+    where: { status: "PENDING" },
+  });
+
+  // Son 7 günlük devam trendi
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const sevenDaysAgoUTC = new Date(sevenDaysAgo.toISOString().slice(0, 10) + "T00:00:00.000Z");
+  const attendanceTrend = await prisma.attendance.groupBy({
+    by: ["date"],
+    where: {
+      date: { gte: sevenDaysAgoUTC, lte: todayStartUTC },
+      status: { in: ["PRESENT", "HALF_DAY"] },
+    },
+    _count: true,
+    orderBy: { date: "asc" },
+  });
+  const puantajTrend = attendanceTrend.map((a) => ({
+    date: a.date.toISOString().split("T")[0],
+    count: a._count,
+  }));
+
   return {
     project: {
       id: project.id,
@@ -209,6 +262,17 @@ async function getDashboardData(projectId?: string) {
       status: a.status,
     })),
     workforceTrend: workforceTrendData,
+    puantaj: {
+      activeWorkers: puantajActiveWorkers,
+      totalWorkers: puantajTotalWorkers,
+      todayPresent: puantajPresent,
+      todayAbsent: puantajAbsent,
+      todayLeave: puantajLeave,
+      monthTotalHours: Math.round((puantajMonthAgg._sum.totalHours ?? 0) * 10) / 10,
+      monthOvertime: Math.round((puantajMonthAgg._sum.overtime ?? 0) * 10) / 10,
+      pendingLeaves: puantajPendingLeaves,
+      trend: puantajTrend,
+    },
   };
 }
 

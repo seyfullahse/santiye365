@@ -13,6 +13,12 @@ import {
   Target,
   Clock,
   Activity,
+  ClipboardList,
+  UserCheck,
+  UserX,
+  CalendarOff,
+  Timer,
+  ArrowRight,
 } from "lucide-react";
 import {
   Card,
@@ -55,6 +61,7 @@ import {
   YAxis,
 } from "recharts";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface DashboardData {
   project: {
@@ -113,6 +120,17 @@ interface DashboardData {
     status: string;
   }[];
   workforceTrend: { date: string; count: number }[];
+  puantaj: {
+    activeWorkers: number;
+    totalWorkers: number;
+    todayPresent: number;
+    todayAbsent: number;
+    todayLeave: number;
+    monthTotalHours: number;
+    monthOvertime: number;
+    pendingLeaves: number;
+    trend: { date: string; count: number }[];
+  };
 }
 
 const disciplineChartConfig = {
@@ -150,7 +168,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       {/* Başlık */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Gösterge Paneli</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Proje Göstergesi</h1>
           <p className="text-sm sm:text-base text-muted-foreground">
             {data.project.name}
             {data.project.client && ` — ${data.project.client}`}
@@ -625,6 +643,126 @@ export function DashboardClient({ data }: { data: DashboardData }) {
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* PUANTAJ MODÜLÜ */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-teal-600" />
+                Puantaj Özeti
+              </CardTitle>
+              <CardDescription>
+                Günlük devam durumu ve aylık çalışma saatleri
+              </CardDescription>
+            </div>
+            <Link href="/puantaj">
+              <Button variant="outline" size="sm">
+                Puantaja Git
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Puantaj Üst Kartları */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/30">
+                <Users className="h-5 w-5 text-teal-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Aktif Çalışan</p>
+                <p className="text-xl font-bold">{data.puantaj.activeWorkers}<span className="text-sm font-normal text-muted-foreground">/{data.puantaj.totalWorkers}</span></p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                <UserCheck className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Bugün Gelen</p>
+                <p className="text-xl font-bold text-green-600">{data.puantaj.todayPresent}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                <UserX className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Bugün Gelmeyen</p>
+                <p className="text-xl font-bold text-red-600">{data.puantaj.todayAbsent}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
+                <CalendarOff className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">İzinli</p>
+                <p className="text-xl font-bold text-orange-600">{data.puantaj.todayLeave}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Puantaj Alt Bilgiler */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                <Timer className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Aylık Toplam Saat</p>
+                <p className="text-xl font-bold">{data.puantaj.monthTotalHours}<span className="text-sm font-normal text-muted-foreground"> saat</span></p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30">
+                <Clock className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Aylık Mesai</p>
+                <p className="text-xl font-bold">{data.puantaj.monthOvertime}<span className="text-sm font-normal text-muted-foreground"> saat</span></p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+                <CheckCircle2 className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Bekleyen İzin</p>
+                <p className="text-xl font-bold">{data.puantaj.pendingLeaves}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Devam Trendi (mini bar) */}
+          {data.puantaj.trend.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-2">Son 7 Gün Devam</p>
+              <div className="flex items-end gap-1 h-16">
+                {data.puantaj.trend.map((t) => {
+                  const maxCount = Math.max(...data.puantaj.trend.map((x) => x.count), 1);
+                  const heightPct = (t.count / maxCount) * 100;
+                  const d = new Date(t.date);
+                  const dayLabel = d.toLocaleDateString("tr-TR", { weekday: "short" });
+                  return (
+                    <div key={t.date} className="flex-1 flex flex-col items-center gap-0.5">
+                      <span className="text-[10px] text-muted-foreground">{t.count}</span>
+                      <div
+                        className="w-full rounded-t bg-teal-500 dark:bg-teal-600 min-h-[4px] transition-all"
+                        style={{ height: `${Math.max(heightPct, 5)}%` }}
+                      />
+                      <span className="text-[10px] text-muted-foreground">{dayLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

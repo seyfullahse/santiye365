@@ -3,6 +3,7 @@ version: "3.9"
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: santiye360
       POSTGRES_USER: postgres
@@ -13,10 +14,16 @@ services:
       - "55432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    shm_size: '128mb'
 
   app:
     build:
       context: .
+    restart: unless-stopped
     depends_on:
       - db
     environment:
@@ -25,9 +32,15 @@ services:
       AUTH_TRUST_HOST: "true"
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:4000}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-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}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-sk_11e8333df19e0c54effbc3021229a4f17b3a616075385c06}
+      NODE_OPTIONS: "--max-old-space-size=512"
       PORT: 4000
     ports:
       - "4000:4000"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     command: ["node", "server.js"]
 
 volumes:
