@@ -32,7 +32,7 @@ async function main() {
     workerId: string;
     date: Date;
     shift: "DAY" | "NIGHT";
-    status: string;
+    status: (typeof statuses)[number];
     totalHours: number;
     overtime: number;
     note: string | null;
