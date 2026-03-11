@@ -11,7 +11,7 @@ export default async function HomePage() {
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-  const [activeProjects, totalWorkers, pendingApprovals, todayAttendance, recentActivities, mainCompany] =
+  const [activeProjects, totalWorkers, pendingApprovals, todayAttendance, recentActivities] =
     await Promise.all([
       prisma.project.count({ where: { status: "ACTIVE" } }),
       prisma.employee.count({ where: { status: "ACTIVE" } }),
@@ -29,10 +29,6 @@ export default async function HomePage() {
           project: { select: { name: true } },
           discipline: { select: { name: true } },
         },
-      }),
-      prisma.company.findFirst({
-        where: { type: "MAIN" },
-        select: { id: true, name: true, phone: true, email: true, address: true, city: true },
       }),
     ]);
 
@@ -56,7 +52,6 @@ export default async function HomePage() {
         progressPercent: a.progressPercent,
         updatedAt: a.updatedAt.toISOString(),
       }))}
-      mainCompany={mainCompany}
     />
   );
 }

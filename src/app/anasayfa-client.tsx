@@ -54,10 +54,6 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 /* ══════════════════ TYPES ══════════════════ */
 
@@ -78,22 +74,12 @@ interface RecentActivity {
   updatedAt: string;
 }
 
-interface MainCompanyInfo {
-  id: string;
-  name: string;
-  phone: string | null;
-  email: string | null;
-  address: string | null;
-  city: string | null;
-}
-
 interface AnasayfaProps {
   userName: string;
   userEmail: string;
   userRole: string;
   kpiData: KpiData;
   recentActivities: RecentActivity[];
-  mainCompany: MainCompanyInfo | null;
 }
 
 interface AIData {
@@ -145,7 +131,7 @@ const classicModules: ClassicModule[] = [
   {
     name: "Proje Yönetimi",
     icon: FolderKanban,
-    href: "/dashboard",
+    href: "/projeler",
     color: "bg-blue-600",
     description: "Aktivite, mahal, kat, risk ve onay takibi",
     features: ["Aktiviteler", "İş Programı", "Mahaller & Katlar", "Puantaj", "Günlük Saha Raporu", "Riskler", "Kalite Kayıtları", "Onaylar", "Malzemeler"],
@@ -503,34 +489,10 @@ function AnnouncementWidget() {
   );
 }
 
-function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities, mainCompany }: AnasayfaProps) {
+function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities }: AnasayfaProps) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
   const isSuperAdmin = userRole === "SUPER_ADMIN";
-  const [showFirmaDialog, setShowFirmaDialog] = useState(false);
-  const [firmaForm, setFirmaForm] = useState({ name: "", phone: "", email: "", address: "", city: "" });
-  const [firmaLoading, setFirmaLoading] = useState(false);
-  const [currentMainCompany, setCurrentMainCompany] = useState(mainCompany);
-
-  const handleFirmaSave = async () => {
-    if (!firmaForm.name.trim()) return;
-    setFirmaLoading(true);
-    try {
-      const res = await fetch("/api/sirketler/ana-firma", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(firmaForm),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentMainCompany(data);
-        setShowFirmaDialog(false);
-        setFirmaForm({ name: "", phone: "", email: "", address: "", city: "" });
-      }
-    } finally {
-      setFirmaLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -565,88 +527,6 @@ function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities,
           <h1 className="text-xl sm:text-2xl font-bold">{greeting}, {userName.split(" ")[0]}! 👋</h1>
           <p className="text-sm text-muted-foreground mt-1">Şantiye360 platformuna hoş geldiniz. İşte güncel durumunuz.</p>
         </div>
-
-        {/* Ana Firma Kartı */}
-        {isSuperAdmin && (
-          currentMainCompany ? (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="flex items-center gap-4 py-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-base">{currentMainCompany.name}</h3>
-                    <Badge variant="default" className="text-[10px]">Ana Firma</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {[currentMainCompany.city, currentMainCompany.phone, currentMainCompany.email].filter(Boolean).join(" · ") || "Detay bilgisi girilmemiş"}
-                  </p>
-                </div>
-                <Link href="/organizasyon/profil" className="text-xs text-primary hover:underline whitespace-nowrap">
-                  Düzenle →
-                </Link>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border-dashed border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/20">
-              <CardContent className="flex items-center gap-4 py-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600">
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm text-amber-800 dark:text-amber-200">Ana Firma Tanımlı Değil</h3>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">İK personeli ve modüller için ana firma tanımlanmalıdır.</p>
-                </div>
-                <Button size="sm" onClick={() => setShowFirmaDialog(true)} className="whitespace-nowrap">
-                  <Building2 className="h-4 w-4 mr-1.5" />
-                  Ana Firma Ekle
-                </Button>
-              </CardContent>
-            </Card>
-          )
-        )}
-
-        {/* Ana Firma Ekleme Dialogu */}
-        <Dialog open={showFirmaDialog} onOpenChange={setShowFirmaDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Ana Firma Ekle</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="firma-name">Firma Adı *</Label>
-                <Input id="firma-name" placeholder="Örn: Barış İnşaat" value={firmaForm.name} onChange={(e) => setFirmaForm(f => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="firma-phone">Telefon</Label>
-                  <Input id="firma-phone" placeholder="0212 xxx xx xx" value={firmaForm.phone} onChange={(e) => setFirmaForm(f => ({ ...f, phone: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="firma-email">E-posta</Label>
-                  <Input id="firma-email" placeholder="info@firma.com" value={firmaForm.email} onChange={(e) => setFirmaForm(f => ({ ...f, email: e.target.value }))} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="firma-city">Şehir</Label>
-                  <Input id="firma-city" placeholder="İstanbul" value={firmaForm.city} onChange={(e) => setFirmaForm(f => ({ ...f, city: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="firma-address">Adres</Label>
-                  <Input id="firma-address" placeholder="Adres" value={firmaForm.address} onChange={(e) => setFirmaForm(f => ({ ...f, address: e.target.value }))} />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowFirmaDialog(false)}>İptal</Button>
-              <Button onClick={handleFirmaSave} disabled={firmaLoading || !firmaForm.name.trim()}>
-                {firmaLoading ? "Kaydediliyor..." : "Kaydet"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <ClassicKpiCard icon={FolderKanban} value={kpiData.activeProjects} label="Aktif Proje" color="bg-blue-500" />
@@ -702,7 +582,7 @@ function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities,
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
               {[
                 { name: "Yönetici Paneli", icon: LayoutDashboard, href: "/yonetim-paneli", color: "bg-orange-500" },
-                { name: "Projeler", icon: FolderKanban, href: "/dashboard", color: "bg-blue-600" },
+                { name: "Projeler", icon: FolderKanban, href: "/projeler", color: "bg-blue-600" },
                 { name: "Aktiviteler", icon: Activity, href: "/aktiviteler", color: "bg-green-500" },
                 { name: "Mahaller", icon: MapPin, href: "/mahaller", color: "bg-emerald-500" },
                 { name: "Katlar", icon: Layers, href: "/katlar", color: "bg-teal-500" },
@@ -812,7 +692,7 @@ const aiSections = [
     dotColor: "bg-blue-500",
     modules: [
       { key: "yonetim-paneli", name: "Yönetici Paneli", tagline: "Tüm projeler, tek ekran. Gerçek zamanlı karar destek sistemi.", icon: LayoutDashboard, href: "/yonetim-paneli", active: true, gradient: "from-orange-500 to-amber-500", bg: "bg-orange-500/10", text: "text-orange-500" },
-      { key: "proje-yonetimi", name: "Proje Yönetimi", tagline: "Bütçe, süre, ilerleme — her projenin dijital nabzı elinizde.", icon: FolderKanban, href: "/dashboard", active: true, gradient: "from-blue-500 to-indigo-500", bg: "bg-blue-500/10", text: "text-blue-500" },
+      { key: "proje-yonetimi", name: "Proje Yönetimi", tagline: "Bütçe, süre, ilerleme — her projenin dijital nabzı elinizde.", icon: FolderKanban, href: "/projeler", active: true, gradient: "from-blue-500 to-indigo-500", bg: "bg-blue-500/10", text: "text-blue-500" },
     ],
   },
   {
@@ -1118,7 +998,7 @@ function AIView({ userName, userEmail, userRole, kpiData }: AnasayfaProps) {
             <p className="text-white/20 text-xs mb-3">Tüm veriler gerçek zamanlı.</p>
             <div className="flex flex-col sm:flex-row justify-center gap-3">
               <Link href="/yonetim-paneli"><motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-shadow"><BarChart3 className="h-4 w-4" />Yönetici Paneline Git</motion.button></Link>
-              <Link href="/dashboard"><motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white/80 text-sm font-medium hover:bg-white/10 transition-colors"><FolderKanban className="h-4 w-4" />Proje Yönetimine Git</motion.button></Link>
+              <Link href="/projeler"><motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white/80 text-sm font-medium hover:bg-white/10 transition-colors"><FolderKanban className="h-4 w-4" />Proje Yönetimine Git</motion.button></Link>
             </div>
           </motion.div>
         )}

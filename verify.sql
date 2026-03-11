@@ -1,0 +1,1 @@
+﻿SELECT c.name, c.type, count(e.id) FROM companies c LEFT JOIN employees e ON e.company_id = c.id GROUP BY c.id, c.name, c.type ORDER BY c.type;

@@ -1,0 +1,1 @@
+﻿UPDATE employees SET company_id = (SELECT id FROM companies WHERE type = 'MAIN' LIMIT 1) WHERE company_id IS NULL;

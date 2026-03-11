@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 import {
   Plus,
   Pencil,
@@ -13,6 +15,10 @@ import {
   Building2,
   ArrowRight,
   Search,
+  HardHat,
+  LogOut,
+  Settings,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface Project {
   id: string;
@@ -77,6 +84,7 @@ const statusDotColors: Record<string, string> = {
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -164,7 +172,36 @@ export default function ProjectsPage() {
   const onHoldCount = projects.filter((p) => p.status === "ON_HOLD").length;
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-background">
+      {/* Üst Header — Anasayfa benzeri */}
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl flex h-14 items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <HardHat className="h-7 w-7 text-primary" />
+              <span className="text-sm font-bold tracking-tight">Şantiye360</span>
+            </Link>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block text-right">
+              <p className="text-xs font-medium">{session?.user?.name ?? "Kullanıcı"}</p>
+              <p className="text-[10px] text-muted-foreground">{session?.user?.email ?? ""}</p>
+            </div>
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="text-xs font-semibold">{session?.user?.name?.charAt(0) ?? "U"}</AvatarFallback>
+            </Avatar>
+            <Link href="/ayarlar" className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Ayarlar">
+              <Settings className="h-4 w-4" />
+            </Link>
+            <button onClick={() => signOut({ redirectTo: "/giris" })} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Çıkış Yap">
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 space-y-6">
       {/* Başlık */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -313,7 +350,7 @@ export default function ProjectsPage() {
             <Card
               key={project.id}
               className="group cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200 flex flex-col"
-              onClick={() => router.push(`/dashboard?project=${project.id}`)}
+              onClick={() => router.push(`/projeler/${project.id}`)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -524,6 +561,7 @@ export default function ProjectsPage() {
           </form>
         </DialogContent>
       </Dialog>
+      </main>
     </div>
   );
 }
