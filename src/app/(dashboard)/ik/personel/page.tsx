@@ -48,7 +48,7 @@ interface Employee {
   team: { id: string; name: string } | null;
 }
 
-interface SelectOption { id: string; name: string }
+interface SelectOption { id: string; name: string; type?: string }
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   ACTIVE: { label: "Aktif", variant: "default" },
@@ -83,6 +83,7 @@ export default function PersonelPage() {
 
   const [importing, setImporting] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const [mainCompanyId, setMainCompanyId] = useState<string>("");
 
   // Dropdown data
   const [departments, setDepartments] = useState<SelectOption[]>([]);
@@ -115,7 +116,11 @@ export default function PersonelPage() {
       deptRes.json(), compRes.json(), projRes.json(), teamRes.json(),
     ]);
     setDepartments(Array.isArray(deptData) ? deptData : []);
-    setCompanies(Array.isArray(compData) ? compData : []);
+    const comps = Array.isArray(compData) ? compData : [];
+    setCompanies(comps);
+    // Ana firma (MAIN) varsayılan olarak seçilsin
+    const mainComp = comps.find((c: SelectOption & { type?: string }) => c.type === "MAIN");
+    if (mainComp) setMainCompanyId(mainComp.id);
     setProjects(Array.isArray(projData) ? projData : []);
     setTeams(Array.isArray(teamData) ? teamData : []);
   }, []);
@@ -135,7 +140,7 @@ export default function PersonelPage() {
     }
   }, [form.departmentId]);
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, companyId: mainCompanyId }); setDialogOpen(true); };
   const openEdit = (emp: Employee) => {
     setEditing(emp);
     setForm({

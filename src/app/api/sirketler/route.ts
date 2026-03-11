@@ -17,6 +17,15 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    
+    // MAIN firma zaten varsa, tekrar oluşturmayı engelle
+    if (body.type === "MAIN") {
+      const existing = await prisma.company.findFirst({ where: { type: "MAIN" } });
+      if (existing) {
+        return NextResponse.json({ error: "Ana firma zaten mevcut. Sadece bir ana firma olabilir." }, { status: 409 });
+      }
+    }
+    
     const company = await prisma.company.create({
       data: {
         name: body.name,

@@ -54,6 +54,10 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /* ══════════════════ TYPES ══════════════════ */
 
@@ -74,12 +78,22 @@ interface RecentActivity {
   updatedAt: string;
 }
 
+interface MainCompanyInfo {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+}
+
 interface AnasayfaProps {
   userName: string;
   userEmail: string;
   userRole: string;
   kpiData: KpiData;
   recentActivities: RecentActivity[];
+  mainCompany: MainCompanyInfo | null;
 }
 
 interface AIData {
@@ -489,10 +503,34 @@ function AnnouncementWidget() {
   );
 }
 
-function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities }: AnasayfaProps) {
+function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities, mainCompany }: AnasayfaProps) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
   const isSuperAdmin = userRole === "SUPER_ADMIN";
+  const [showFirmaDialog, setShowFirmaDialog] = useState(false);
+  const [firmaForm, setFirmaForm] = useState({ name: "", phone: "", email: "", address: "", city: "" });
+  const [firmaLoading, setFirmaLoading] = useState(false);
+  const [currentMainCompany, setCurrentMainCompany] = useState(mainCompany);
+
+  const handleFirmaSave = async () => {
+    if (!firmaForm.name.trim()) return;
+    setFirmaLoading(true);
+    try {
+      const res = await fetch("/api/sirketler/ana-firma", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(firmaForm),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentMainCompany(data);
+        setShowFirmaDialog(false);
+        setFirmaForm({ name: "", phone: "", email: "", address: "", city: "" });
+      }
+    } finally {
+      setFirmaLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -527,6 +565,88 @@ function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities 
           <h1 className="text-xl sm:text-2xl font-bold">{greeting}, {userName.split(" ")[0]}! 👋</h1>
           <p className="text-sm text-muted-foreground mt-1">Şantiye360 platformuna hoş geldiniz. İşte güncel durumunuz.</p>
         </div>
+
+        {/* Ana Firma Kartı */}
+        {isSuperAdmin && (
+          currentMainCompany ? (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="flex items-center gap-4 py-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-base">{currentMainCompany.name}</h3>
+                    <Badge variant="default" className="text-[10px]">Ana Firma</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {[currentMainCompany.city, currentMainCompany.phone, currentMainCompany.email].filter(Boolean).join(" · ") || "Detay bilgisi girilmemiş"}
+                  </p>
+                </div>
+                <Link href="/organizasyon/profil" className="text-xs text-primary hover:underline whitespace-nowrap">
+                  Düzenle →
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-dashed border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+              <CardContent className="flex items-center gap-4 py-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-sm text-amber-800 dark:text-amber-200">Ana Firma Tanımlı Değil</h3>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">İK personeli ve modüller için ana firma tanımlanmalıdır.</p>
+                </div>
+                <Button size="sm" onClick={() => setShowFirmaDialog(true)} className="whitespace-nowrap">
+                  <Building2 className="h-4 w-4 mr-1.5" />
+                  Ana Firma Ekle
+                </Button>
+              </CardContent>
+            </Card>
+          )
+        )}
+
+        {/* Ana Firma Ekleme Dialogu */}
+        <Dialog open={showFirmaDialog} onOpenChange={setShowFirmaDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Ana Firma Ekle</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="firma-name">Firma Adı *</Label>
+                <Input id="firma-name" placeholder="Örn: Barış İnşaat" value={firmaForm.name} onChange={(e) => setFirmaForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="firma-phone">Telefon</Label>
+                  <Input id="firma-phone" placeholder="0212 xxx xx xx" value={firmaForm.phone} onChange={(e) => setFirmaForm(f => ({ ...f, phone: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="firma-email">E-posta</Label>
+                  <Input id="firma-email" placeholder="info@firma.com" value={firmaForm.email} onChange={(e) => setFirmaForm(f => ({ ...f, email: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="firma-city">Şehir</Label>
+                  <Input id="firma-city" placeholder="İstanbul" value={firmaForm.city} onChange={(e) => setFirmaForm(f => ({ ...f, city: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="firma-address">Adres</Label>
+                  <Input id="firma-address" placeholder="Adres" value={firmaForm.address} onChange={(e) => setFirmaForm(f => ({ ...f, address: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowFirmaDialog(false)}>İptal</Button>
+              <Button onClick={handleFirmaSave} disabled={firmaLoading || !firmaForm.name.trim()}>
+                {firmaLoading ? "Kaydediliyor..." : "Kaydet"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <ClassicKpiCard icon={FolderKanban} value={kpiData.activeProjects} label="Aktif Proje" color="bg-blue-500" />

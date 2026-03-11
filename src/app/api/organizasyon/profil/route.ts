@@ -1,15 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// GET — Ana firma profilini getir (singleton)
+// GET — Ana firma profilini getir
+// Önce MAIN Company'den çek, yoksa CompanyProfile'dan çek
 export async function GET() {
   try {
+    // Önce MAIN Company'den bilgileri al
+    const mainCompany = await prisma.company.findFirst({ where: { type: "MAIN" } });
+    
     let profile = await prisma.companyProfile.findFirst();
     if (!profile) {
       profile = await prisma.companyProfile.create({
-        data: { name: "Ana Firma" },
+        data: { name: mainCompany?.name ?? "Ana Firma" },
       });
     }
+    
+    // MAIN Company varsa, profili onunla senkronize et
+    if (mainCompany) {
+      return NextResponse.json({
+        ...profile,
+        name: mainCompany.name,
+        phone: mainCompany.phone ?? profile.phone,
+        email: mainCompany.email ?? profile.email,
+        address: mainCompany.address ?? profile.address,
+        website: mainCompany.website ?? profile.website,
+        taxNo: mainCompany.taxNo ?? profile.taxNo,
+        taxOffice: mainCompany.taxOffice ?? profile.taxOffice,
+      });
+    }
+    
     return NextResponse.json(profile);
   } catch (error) {
     console.error("GET /api/organizasyon/profil error:", error);
@@ -17,12 +36,12 @@ export async function GET() {
   }
 }
 
-// PUT — Ana firma profilini güncelle
+// PUT — Ana firma profilini güncelle (hem CompanyProfile hem MAIN Company)
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Singleton — find first or create
+    // CompanyProfile güncelle
     let profile = await prisma.companyProfile.findFirst();
     if (!profile) {
       profile = await prisma.companyProfile.create({
@@ -46,6 +65,23 @@ export async function PUT(req: NextRequest) {
         description: body.description ?? null,
       },
     });
+
+    // MAIN Company'yi de senkronize et
+    const mainCompany = await prisma.company.findFirst({ where: { type: "MAIN" } });
+    if (mainCompany) {
+      await prisma.company.update({
+        where: { id: mainCompany.id },
+        data: {
+          name: body.name ?? mainCompany.name,
+          phone: body.phone ?? null,
+          email: body.email ?? null,
+          address: body.address ?? null,
+          website: body.website ?? null,
+          taxNo: body.taxNo ?? null,
+          taxOffice: body.taxOffice ?? null,
+        },
+      });
+    }
 
     return NextResponse.json(updated);
   } catch (error) {
