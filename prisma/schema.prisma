@@ -330,7 +330,7 @@ model Worker {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  team          Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team          Team           @relation(fields: [teamId], references: [id], onDelete: Restrict)
   attendances   Attendance[]
   leaveRequests WorkerLeave[]
   salaries      WorkerSalary[]
