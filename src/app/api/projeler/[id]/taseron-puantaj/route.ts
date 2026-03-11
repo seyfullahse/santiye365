@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // GET  /api/projeler/[id]/taseron-puantaj?date=2025-01-15
 // POST /api/projeler/[id]/taseron-puantaj
