@@ -347,10 +347,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo */}
       <Link
         href="/"
-        className="flex items-center gap-2 lg:gap-3 px-4 lg:px-6 py-4 lg:py-6 hover:opacity-80 transition-opacity"
+        className="flex items-center gap-2 px-4 lg:px-5 py-3 lg:py-4 hover:opacity-80 transition-opacity"
       >
-        <HardHat className="h-7 w-7 lg:h-10 lg:w-10 text-primary" />
-        <span className="text-lg lg:text-2xl font-bold">Şantiye360</span>
+        <HardHat className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
+        <span className="text-sm lg:text-base font-bold">Şantiye360</span>
       </Link>
       <Separator />
 
