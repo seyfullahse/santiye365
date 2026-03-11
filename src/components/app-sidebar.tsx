@@ -135,7 +135,8 @@ function getProjectScopedNav(projectId: string) {
     { name: "Ekipler", href: `/projeler/${projectId}/ekipler`, icon: Users },
     { name: "Çalışanlar", href: `/projeler/${projectId}/calisanlar`, icon: UserCheck },
     { name: "Günlük Personel", href: `/projeler/${projectId}/personel`, icon: HardHat },
-    { name: "Puantaj", href: `/projeler/${projectId}/puantaj`, icon: ClipboardList },
+    { name: "Firma Puantaj", href: `/projeler/${projectId}/firma-puantaj`, icon: ClipboardList },
+    { name: "Taşeron Puantaj", href: `/projeler/${projectId}/taseron-puantaj`, icon: HardHat },
   ];
 }
 

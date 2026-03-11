@@ -51,7 +51,8 @@ const pageNames: Record<string, string> = {
   ekipler: "Ekipler",
   calisanlar: "Çalışanlar",
   personel: "Günlük Personel",
-  puantaj: "Puantaj",
+  "firma-puantaj": "Firma Puantaj",
+  "taseron-puantaj": "Taşeron Puantaj",
   onaylar: "Onaylar",
   riskler: "Riskler",
 };

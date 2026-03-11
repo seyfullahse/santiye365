@@ -124,13 +124,22 @@ const sections = [
     borderColor: "border-amber-200 dark:border-amber-800",
   },
   {
-    key: "puantaj",
-    name: "Puantaj",
-    description: "Günlük devam ve mesai takibi",
+    key: "firma-puantaj",
+    name: "Firma Puantaj",
+    description: "Firma çalışanları devam ve mesai takibi",
     icon: ClipboardList,
     color: "text-teal-600",
     bgColor: "bg-teal-50 dark:bg-teal-950/30",
     borderColor: "border-teal-200 dark:border-teal-800",
+  },
+  {
+    key: "taseron-puantaj",
+    name: "Taşeron Puantaj",
+    description: "Taşeron firma çalışanları puantaj girişi",
+    icon: HardHat,
+    color: "text-violet-600",
+    bgColor: "bg-violet-50 dark:bg-violet-950/30",
+    borderColor: "border-violet-200 dark:border-violet-800",
   },
 ];
 
