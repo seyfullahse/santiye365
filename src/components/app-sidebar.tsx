@@ -126,8 +126,7 @@ function getProjectScopedNav(projectId: string) {
   return [
     { name: "Proje Özeti", href: `/projeler/${projectId}`, icon: FolderKanban, exact: true },
     { name: "Gösterge Paneli", href: `/projeler/${projectId}/dashboard`, icon: LayoutDashboard },
-    { name: "Mahaller", href: `/projeler/${projectId}/mahaller`, icon: MapPin },
-    { name: "Katlar", href: `/projeler/${projectId}/katlar`, icon: Layers },
+    { name: "Mahaller & Katlar", href: `/projeler/${projectId}/mahaller`, icon: MapPin },
     { name: "Aktiviteler", href: `/projeler/${projectId}/aktiviteler`, icon: Activity },
     { name: "Malzeme Takip", href: `/projeler/${projectId}/malzemeler`, icon: Package },
     { name: "Onaylar", href: `/projeler/${projectId}/onaylar`, icon: CheckCircle2 },

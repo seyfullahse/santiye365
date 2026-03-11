@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   MapPin,
-  Layers,
   Activity,
   Package,
   CheckCircle2,
@@ -45,21 +44,12 @@ const sections = [
   },
   {
     key: "mahaller",
-    name: "Mahaller",
-    description: "Proje mahallerini görüntüle ve yönet",
+    name: "Mahaller & Katlar",
+    description: "Proje mahalleri ve katları tek ekranda yönetin",
     icon: MapPin,
     color: "text-emerald-600",
     bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
     borderColor: "border-emerald-200 dark:border-emerald-800",
-  },
-  {
-    key: "katlar",
-    name: "Katlar",
-    description: "Kat tanımları ve sıralama",
-    icon: Layers,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50 dark:bg-purple-950/30",
-    borderColor: "border-purple-200 dark:border-purple-800",
   },
   {
     key: "aktiviteler",

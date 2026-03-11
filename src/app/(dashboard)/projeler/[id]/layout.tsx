@@ -44,8 +44,7 @@ const statusColors: Record<string, "default" | "secondary" | "destructive" | "ou
 /* ─── Breadcrumb Map ─── */
 const pageNames: Record<string, string> = {
   dashboard: "Gösterge Paneli",
-  mahaller: "Mahaller",
-  katlar: "Katlar",
+  mahaller: "Mahaller & Katlar",
   aktiviteler: "Aktiviteler",
   malzemeler: "Malzeme Takip",
   sirketler: "Şirketler",
