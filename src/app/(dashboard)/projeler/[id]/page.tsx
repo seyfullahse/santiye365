@@ -13,6 +13,11 @@ import {
   ArrowRight,
   Loader2,
   TrendingUp,
+  Building2,
+  Users,
+  UserCheck,
+  HardHat,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useProject } from "./layout";
@@ -91,6 +96,51 @@ const sections = [
     color: "text-red-600",
     bgColor: "bg-red-50 dark:bg-red-950/30",
     borderColor: "border-red-200 dark:border-red-800",
+  },
+  {
+    key: "sirketler",
+    name: "Şirketler",
+    description: "Şantiye şirketleri ve taşeronlar",
+    icon: Building2,
+    color: "text-rose-600",
+    bgColor: "bg-rose-50 dark:bg-rose-950/30",
+    borderColor: "border-rose-200 dark:border-rose-800",
+  },
+  {
+    key: "ekipler",
+    name: "Ekipler",
+    description: "Ekip yönetimi ve görevlendirme",
+    icon: Users,
+    color: "text-pink-600",
+    bgColor: "bg-pink-50 dark:bg-pink-950/30",
+    borderColor: "border-pink-200 dark:border-pink-800",
+  },
+  {
+    key: "calisanlar",
+    name: "Çalışanlar",
+    description: "Şantiye çalışan Yönetimi",
+    icon: UserCheck,
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50 dark:bg-indigo-950/30",
+    borderColor: "border-indigo-200 dark:border-indigo-800",
+  },
+  {
+    key: "personel",
+    name: "Günlük Personel",
+    description: "Günlük saha personel takibi",
+    icon: HardHat,
+    color: "text-amber-600",
+    bgColor: "bg-amber-50 dark:bg-amber-950/30",
+    borderColor: "border-amber-200 dark:border-amber-800",
+  },
+  {
+    key: "puantaj",
+    name: "Puantaj",
+    description: "Günlük devam ve mesai takibi",
+    icon: ClipboardList,
+    color: "text-teal-600",
+    bgColor: "bg-teal-50 dark:bg-teal-950/30",
+    borderColor: "border-teal-200 dark:border-teal-800",
   },
 ];
 
