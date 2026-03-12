@@ -106,11 +106,7 @@ const hakedisNavigation = [
 
 /* ─────── Puantaj Navigasyonu ─────── */
 const puantajNavigation = [
-  { name: "Genel Bakış", href: "/puantaj", icon: LayoutDashboard },
-  { name: "Günlük Puantaj", href: "/puantaj/gunluk", icon: CalendarDays },
-  { name: "Aylık Puantaj", href: "/puantaj/aylik", icon: CalendarRange },
-  { name: "Çalışanlar", href: "/puantaj/calisanlar", icon: Users },
-  { name: "Raporlar", href: "/puantaj/raporlar", icon: BarChart3 },
+  { name: "Proje Seçimi", href: "/puantaj", icon: FolderKanban },
 ];
 
 /* ─────── Muhasebe Navigasyonu ─────── */
@@ -261,9 +257,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const isToplanti = pathname.startsWith("/toplanti-tutanaklari");
   const isPuantaj = pathname.startsWith("/puantaj");
   const isMuhasebe = pathname.startsWith("/muhasebe");
+  const isIndirimler = pathname.startsWith("/indirimler");
   const activeProjectId = extractProjectId(pathname);
   const isInsideProject = !!activeProjectId;
-  const isProject = !isCRM && !isDuyurular && !isIK && !isISG && !isOrg && !isHakedis && !isYatirim && !isTaseron && !isMaskot && !isKullanicilar && !isSunum && !isTeklif && !isToplanti && !isPuantaj && !isMuhasebe;
+  const isProject = !isCRM && !isDuyurular && !isIK && !isISG && !isOrg && !isHakedis && !isYatirim && !isTaseron && !isMaskot && !isKullanicilar && !isSunum && !isTeklif && !isToplanti && !isPuantaj && !isMuhasebe && !isIndirimler;
 
   // Aktif modülün navigasyonu
   const activeNav = isCRM
@@ -296,6 +293,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     ? puantajNavigation
     : isMuhasebe
     ? muhasebeNavigation
+    : isIndirimler
+    ? [{ name: "Tüm İndirimler", href: "/indirimler", icon: Tag }]
     : isInsideProject
     ? getProjectScopedNav(activeProjectId)
     : projectNavigation;
@@ -329,11 +328,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     ? "Puantaj Sistemi"
     : isMuhasebe
     ? "Muhasebe"
+    : isIndirimler
+    ? "Çalışan İndirimleri"
     : isInsideProject
     ? "Proje Modülleri"
     : "Proje Yönetimi";
-  const ModuleIcon = isCRM ? UserCheck : isDuyurular ? Megaphone : isOrg ? Network : isIK ? UserCheck : isISG ? Shield : isHakedis ? Receipt : isYatirim ? LineChart : isTaseron ? Truck : isMaskot ? Bot : isKullanicilar ? Users : isSunum ? Monitor : isTeklif ? Gavel : isToplanti ? ClipboardCheck : isPuantaj ? ClipboardList : isMuhasebe ? Banknote : FolderKanban;
-  const moduleColor = isCRM ? "text-pink-600" : isDuyurular ? "text-sky-600" : isOrg ? "text-violet-600" : isIK ? "text-cyan-600" : isISG ? "text-red-600" : isHakedis ? "text-amber-600" : isYatirim ? "text-emerald-600" : isTaseron ? "text-orange-600" : isMaskot ? "text-purple-600" : isKullanicilar ? "text-indigo-600" : isSunum ? "text-teal-600" : isTeklif ? "text-rose-600" : isToplanti ? "text-lime-600" : isPuantaj ? "text-teal-600" : isMuhasebe ? "text-green-600" : "text-blue-600";
+  const ModuleIcon = isCRM ? UserCheck : isDuyurular ? Megaphone : isOrg ? Network : isIK ? UserCheck : isISG ? Shield : isHakedis ? Receipt : isYatirim ? LineChart : isTaseron ? Truck : isMaskot ? Bot : isKullanicilar ? Users : isSunum ? Monitor : isTeklif ? Gavel : isToplanti ? ClipboardCheck : isPuantaj ? ClipboardList : isMuhasebe ? Banknote : isIndirimler ? Tag : FolderKanban;
+  const moduleColor = isCRM ? "text-pink-600" : isDuyurular ? "text-sky-600" : isOrg ? "text-violet-600" : isIK ? "text-cyan-600" : isISG ? "text-red-600" : isHakedis ? "text-amber-600" : isYatirim ? "text-emerald-600" : isTaseron ? "text-orange-600" : isMaskot ? "text-purple-600" : isKullanicilar ? "text-indigo-600" : isSunum ? "text-teal-600" : isTeklif ? "text-rose-600" : isToplanti ? "text-lime-600" : isPuantaj ? "text-teal-600" : isMuhasebe ? "text-green-600" : isIndirimler ? "text-rose-500" : "text-blue-600";
 
   // Load saved theme brand on mount
   useEffect(() => {
@@ -383,6 +384,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Megaphone className="h-5 w-5" />
           Duyurular
         </Link>
+        <Link
+          href="/indirimler"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+            pathname.startsWith("/indirimler")
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          )}
+        >
+          <Tag className="h-5 w-5" />
+          İndirimler
+        </Link>
 
       </div>
 
@@ -412,7 +426,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="space-y-0.5">
           {activeNav.map((item, index) => {
             const typedItem = item as { name: string; href: string; icon: typeof FolderKanban; exact?: boolean };
-            const baseHref = isCRM ? "/crm" : isDuyurular ? "/duyurular" : isOrg ? "/organizasyon" : isIK ? "/ik" : isISG ? "/isg" : isYatirim ? "/yatirim" : isTaseron ? "/taseron" : isMaskot ? "/maskot" : isKullanicilar ? "/kullanicilar" : isSunum ? "/sunum" : isTeklif ? "/teklif" : isToplanti ? "/toplanti-tutanaklari" : "";
+            const baseHref = isCRM ? "/crm" : isDuyurular ? "/duyurular" : isOrg ? "/organizasyon" : isIK ? "/ik" : isISG ? "/isg" : isYatirim ? "/yatirim" : isTaseron ? "/taseron" : isMaskot ? "/maskot" : isKullanicilar ? "/kullanicilar" : isSunum ? "/sunum" : isTeklif ? "/teklif" : isToplanti ? "/toplanti-tutanaklari" : isIndirimler ? "/indirimler" : "";
             let isActive: boolean;
             if (typedItem.exact) {
               isActive = pathname === typedItem.href;

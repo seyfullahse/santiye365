@@ -164,7 +164,7 @@ async function getDashboardData(projectId?: string) {
   let puantajAbsent = 0;
   let puantajLeave = 0;
   for (const att of todayAttendances) {
-    if (att.status === "PRESENT" || att.status === "HALF_DAY") puantajPresent++;
+    if (att.status === "PRESENT" || att.status === "HALF_DAY" || att.status === "REST_DAY_WORK") puantajPresent++;
     else if (att.status === "ABSENT") puantajAbsent++;
     else puantajLeave++;
   }
@@ -192,7 +192,7 @@ async function getDashboardData(projectId?: string) {
     by: ["date"],
     where: {
       date: { gte: sevenDaysAgoUTC, lte: todayStartUTC },
-      status: { in: ["PRESENT", "HALF_DAY"] },
+      status: { in: ["PRESENT", "HALF_DAY", "REST_DAY_WORK"] },
     },
     _count: true,
     orderBy: { date: "asc" },

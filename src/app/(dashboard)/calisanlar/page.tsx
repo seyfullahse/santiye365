@@ -138,7 +138,7 @@ export default function CalisanlarPage() {
       const res = await fetch("/api/calisanlar");
       if (!res.ok) throw new Error("Çalışanlar yüklenemedi");
       const data = await res.json();
-      setWorkers(data);
+      setWorkers(Array.isArray(data) ? data : []);
     } catch {
       toast.error("Çalışanlar yüklenirken bir hata oluştu.");
     }

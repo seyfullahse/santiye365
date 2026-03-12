@@ -50,6 +50,13 @@ import {
   ShieldAlert,
   ClipboardCheck,
   Banknote,
+  Tag,
+  Percent,
+  Utensils,
+  Shirt,
+  Smartphone,
+  Gift,
+  Store,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -300,6 +307,15 @@ const classicModules: ClassicModule[] = [
     status: "soon",
   },
   {
+    name: "Çalışan İndirimleri",
+    icon: Tag,
+    href: "/indirimler",
+    color: "bg-rose-500",
+    description: "Partner firmalardan çalışan indirimleri",
+    features: ["Firma anlaşmaları", "Kategori yönetimi", "İndirim oranları", "Geçerlilik takibi", "Aktif/Pasif", "İletişim bilgileri"],
+    status: "active",
+  },
+  {
     name: "Kullanıcı Yönetimi",
     icon: Users,
     href: "/kullanicilar",
@@ -489,6 +505,154 @@ function AnnouncementWidget() {
   );
 }
 
+/* ───── Çalışan İndirimleri Widget ───── */
+const CATEGORY_ICONS: Record<string, typeof Tag> = {
+  "Gıda": Utensils,
+  "Giyim": Shirt,
+  "Teknoloji": Smartphone,
+  "Hediye": Gift,
+  "Diğer": Store,
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  "Gıda": "bg-orange-500",
+  "Giyim": "bg-pink-500",
+  "Teknoloji": "bg-blue-500",
+  "Hediye": "bg-purple-500",
+  "Diğer": "bg-gray-500",
+};
+
+interface Discount {
+  id: string;
+  companyName: string;
+  category: string;
+  discountRate: number;
+  description: string | null;
+  logo: string | null;
+  contactInfo: string | null;
+  validUntil: string | null;
+  isActive: boolean;
+}
+
+function DiscountWidget() {
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/indirimler?active=true")
+      .then((r) => {
+        if (!r.ok) throw new Error("API error");
+        return r.json();
+      })
+      .then((data) => setDiscounts(Array.isArray(data) ? data : []))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Tag className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Çalışan İndirimleri</h2>
+        </div>
+        <div className="flex gap-3 overflow-hidden">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Card key={i} className="animate-pulse w-[180px] sm:w-[200px] shrink-0">
+              <CardContent className="p-4 h-32" />
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (discounts.length === 0 && !error) {
+    return null;
+  }
+
+  if (error) {
+    return null;
+  }
+
+  // Kategoriye göre grupla
+  const categories = [...new Set(discounts.map((d) => d.category))];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Tag className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Çalışan İndirimleri</h2>
+          <Badge variant="secondary" className="text-[10px]">{discounts.length} Anlaşma</Badge>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {categories.map((cat) => {
+            const CatIcon = CATEGORY_ICONS[cat] || Tag;
+            return (
+              <Badge key={cat} variant="outline" className="text-[10px] gap-1">
+                <CatIcon className="h-3 w-3" />
+                {cat}
+              </Badge>
+            );
+          })}
+        </div>
+      </div>
+      <div className="relative">
+        <div className="discount-scroll overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+          <style>{`.discount-scroll::-webkit-scrollbar { display: none; }`}</style>
+          <div className="flex gap-3" style={{ minWidth: "max-content" }}>
+            {discounts.map((d) => {
+              const CatIcon = CATEGORY_ICONS[d.category] || Tag;
+              const catColor = CATEGORY_COLORS[d.category] || "bg-gray-500";
+              return (
+                <Card key={d.id} className="group hover:shadow-md transition-all hover:scale-[1.02] relative overflow-hidden w-[180px] sm:w-[200px] shrink-0">
+                {/* İndirim rozeti */}
+                <div className="absolute top-2 right-2 z-10">
+                  <div className="flex items-center gap-0.5 bg-red-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                    <Percent className="h-3 w-3" />
+                    {d.discountRate}
+                  </div>
+                </div>
+                <CardContent className="p-4 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${catColor} text-white shadow-sm shrink-0`}>
+                      <CatIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold leading-tight truncate group-hover:text-primary transition-colors">{d.companyName}</p>
+                      <p className="text-[10px] text-muted-foreground">{d.category}</p>
+                    </div>
+                  </div>
+                  {d.description && (
+                    <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{d.description}</p>
+                  )}
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-auto pt-1 border-t">
+                    {d.contactInfo ? (
+                      <span className="truncate">{d.contactInfo}</span>
+                    ) : (
+                      <span></span>
+                    )}
+                    {d.validUntil && (
+                      <span className="shrink-0">
+                        {new Date(d.validUntil).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}&apos;e kadar
+                      </span>
+                    )}
+                  </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+        {/* Sağ tarafta fade efekti - kaydırılabilirlik göstergesi */}
+        <div className="absolute right-0 top-0 bottom-1 w-12 bg-gradient-to-l from-background to-transparent pointer-events-none" />
+      </div>
+    </div>
+  );
+}
+
 function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities }: AnasayfaProps) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
@@ -534,6 +698,9 @@ function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities 
           <ClassicKpiCard icon={Calendar} value={kpiData.todayAttendance} label="Bugün Devam" color="bg-amber-500" />
           <ClassicKpiCard icon={CheckCircle2} value={kpiData.pendingApprovals} label="Bekleyen Onay" color="bg-purple-500" />
         </div>
+
+        {/* === ÇALIŞAN İNDİRİMLERİ === */}
+        <DiscountWidget />
 
         {/* === KORUNAN ALAN: Modüller + Hızlı Erişim + Aktiviteler === */}
         <div className="relative">

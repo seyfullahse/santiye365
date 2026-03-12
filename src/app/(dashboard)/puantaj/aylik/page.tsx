@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, Fragment, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useCallback, useMemo, useRef, Fragment, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -23,15 +23,16 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Download,
+  Upload,
   ChevronLeft,
   ChevronRight,
   Users,
-  FolderKanban,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import { CompanyTypeSegment, PuantajPagination } from "../components";
+import { toast } from "sonner";
+import { PuantajPagination } from "../components";
 
-type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "DAY_OFF";
+type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "ANNUAL_LEAVE" | "PAID_LEAVE" | "UNPAID_LEAVE" | "SICK_LEAVE" | "DAY_OFF" | "REST_DAY_WORK";
 
 interface Team {
   id: string;
@@ -58,22 +59,23 @@ interface WorkerRow {
   attendances: AttendanceRecord[];
 }
 
-interface Project {
-  id: string;
-  name: string;
-}
-
 const STATUS_SHORT: Record<AttendanceStatus, string> = {
-  PRESENT: "G", HALF_DAY: "Y", ABSENT: "-", DAY_OFF: "HT",
+  PRESENT: "G", HALF_DAY: "Y", ABSENT: "-",
+  ANNUAL_LEAVE: "Yİ", PAID_LEAVE: "Üİ", UNPAID_LEAVE: "Üsİ", SICK_LEAVE: "R",
+  DAY_OFF: "HT", REST_DAY_WORK: "M",
 };
 
 const STATUS_LABELS: Record<AttendanceStatus, string> = {
-  PRESENT: "Geldi", HALF_DAY: "Yarım Gün", ABSENT: "Gelmedi", DAY_OFF: "Hafta Tatili",
+  PRESENT: "Geldi", HALF_DAY: "Yarım Gün", ABSENT: "Gelmedi",
+  ANNUAL_LEAVE: "Yıllık İzin", PAID_LEAVE: "Ücretli İzin", UNPAID_LEAVE: "Ücretsiz İzin", SICK_LEAVE: "Raporlu",
+  DAY_OFF: "Hafta Tatili", REST_DAY_WORK: "H.Tatil Mesai",
 };
 
 const STATUS_SHORT_COLORS: Record<AttendanceStatus, string> = {
   PRESENT: "text-green-600 font-bold", HALF_DAY: "text-blue-600",
-  ABSENT: "text-red-500", DAY_OFF: "text-gray-400",
+  ABSENT: "text-red-500",
+  ANNUAL_LEAVE: "text-amber-600 font-bold", PAID_LEAVE: "text-teal-600 font-bold", UNPAID_LEAVE: "text-orange-500", SICK_LEAVE: "text-purple-600 font-bold",
+  DAY_OFF: "text-gray-400", REST_DAY_WORK: "text-orange-600 font-bold",
 };
 
 function formatDate(d: Date): string {
@@ -110,71 +112,69 @@ export default function AylikPuantajPageWrapper() {
 
 function AylikPuantajPage() {
   const searchParams = useSearchParams();
-  const initialProject = searchParams.get("project") || "all";
+  const router = useRouter();
+  const projectId = searchParams.get("project");
 
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [workers, setWorkers] = useState<WorkerRow[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectName, setProjectName] = useState("");
   const [teams, setTeams] = useState<Team[]>([]);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
-  const [filterProject, setFilterProject] = useState(initialProject);
   const [filterCompany, setFilterCompany] = useState("all");
-  const [filterCompanyType, setFilterCompanyType] = useState("all");
   const [filterTeam, setFilterTeam] = useState("all");
   const [loading, setLoading] = useState(true);
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
 
+  useEffect(() => {
+    if (!projectId) router.push("/puantaj");
+  }, [projectId, router]);
+
   const dates = useMemo(() => getMonthDates(year, month), [year, month]);
   const monthName = new Date(year, month, 1).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
 
   useEffect(() => {
+    if (!projectId) return;
     Promise.all([
       fetch("/api/projeler").then((r) => r.json()),
       fetch("/api/ekipler").then((r) => r.json()),
     ]).then(([projData, teamData]) => {
-      setProjects(projData);
+      const proj = projData.find((p: { id: string; name: string }) => p.id === projectId);
+      setProjectName(proj?.name || "");
       setTeams(teamData);
       const compMap = new Map<string, string>();
       teamData.forEach((t: Team) => compMap.set(t.company.id, t.company.name));
       setCompanies(Array.from(compMap, ([id, name]) => ({ id, name })));
     });
-  }, []);
+  }, [projectId]);
 
   const fetchData = useCallback(() => {
+    if (!projectId) return;
     setLoading(true);
     const params = new URLSearchParams({
       date: dates[0],
       endDate: dates[dates.length - 1],
       shift: "all",
+      projectId,
     });
     if (filterTeam !== "all") params.set("teamId", filterTeam);
     if (filterCompany !== "all") params.set("companyId", filterCompany);
-    if (filterCompanyType !== "all") params.set("companyType", filterCompanyType);
-    if (filterProject !== "all") params.set("projectId", filterProject);
 
     fetch(`/api/puantaj?${params}`)
       .then((r) => r.json())
       .then((data: WorkerRow[]) => {
-        setWorkers(data);
+        setWorkers(Array.isArray(data) ? data : []);
         setCurrentPage(1);
       })
       .finally(() => setLoading(false));
-  }, [dates, filterTeam, filterCompany, filterCompanyType, filterProject]);
+  }, [dates, filterTeam, filterCompany, projectId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Firma listesini companyType'a göre filtrele
-  const filteredCompanies = useMemo(() => {
-    if (filterCompanyType === "all") return companies;
-    return companies.filter((c) => {
-      const team = teams.find((t) => t.company.id === c.id);
-      return team && team.company.type === filterCompanyType;
-    });
-  }, [companies, teams, filterCompanyType]);
+
 
   const changeMonth = (offset: number) => {
     let m = month + offset;
@@ -213,34 +213,174 @@ function AylikPuantajPage() {
     return { totalHours, totalOvertime, totalPresent, totalAbsent };
   }, [workers]);
 
+  const fileRef = useRef<HTMLInputElement>(null);
+
   const exportExcel = () => {
-    const rows = workers.map((w, i) => {
-      const base: Record<string, string | number> = {
-        "#": i + 1,
-        Firma: w.team.company.name,
-        Ekip: w.team.name,
-        "Ad Soyad": `${w.firstName} ${w.lastName}`,
-        Görevi: w.role,
-      };
+    // Header satırı: #, Firma, Ekip, Ad Soyad, Görevi, 1, 2, ..., 31, Gün, Toplam Saat, Mesai
+    const header: (string | number)[] = ["#", "Firma", "Ekip", "Ad Soyad", "Görevi"];
+    dates.forEach((dd) => header.push(new Date(dd + "T00:00:00").getDate()));
+    header.push("Gün", "Toplam Saat", "Mesai");
+
+    const aoa: (string | number)[][] = [header];
+
+    workers.forEach((w, i) => {
+      const row: (string | number)[] = [
+        i + 1,
+        w.team.company.name,
+        w.team.name,
+        `${w.firstName} ${w.lastName}`,
+        w.role,
+      ];
       const attMap = new Map(w.attendances.map((a) => [a.date, a]));
       let totalH = 0, totalO = 0, presentDays = 0;
       dates.forEach((dd) => {
         const att = attMap.get(dd);
-        const dayNum = new Date(dd + "T00:00:00").getDate();
-        base[`${dayNum}`] = att ? STATUS_SHORT[att.status] : (dd <= todayStr ? "X" : "");
+        row.push(att ? STATUS_SHORT[att.status] : (dd <= todayStr ? "X" : ""));
         totalH += att?.totalHours ?? 0;
         totalO += att?.overtime ?? 0;
-        if (att?.status === "PRESENT" || att?.status === "HALF_DAY") presentDays++;
+        if (att?.status === "PRESENT" || att?.status === "HALF_DAY" || att?.status === "REST_DAY_WORK") presentDays++;
       });
-      base["Gün"] = presentDays;
-      base["Toplam Saat"] = totalH;
-      base["Mesai"] = totalO;
-      return base;
+      row.push(presentDays, totalH, totalO);
+      aoa.push(row);
     });
-    const ws = XLSX.utils.json_to_sheet(rows);
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    // Sütun genişlikleri
+    const cols: XLSX.ColInfo[] = [
+      { wch: 4 },   // #
+      { wch: 18 },  // Firma
+      { wch: 14 },  // Ekip
+      { wch: 22 },  // Ad Soyad
+      { wch: 14 },  // Görevi
+    ];
+    dates.forEach(() => cols.push({ wch: 4 }));
+    cols.push({ wch: 5 }, { wch: 10 }, { wch: 7 });
+    ws["!cols"] = cols;
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Aylık Puantaj");
     XLSX.writeFile(wb, `puantaj-aylik-${year}-${String(month + 1).padStart(2, "0")}.xlsx`);
+  };
+
+  // ─── Excel İçe Aktar ───────────────────────────────
+  const REVERSE_STATUS: Record<string, AttendanceStatus> = {
+    G: "PRESENT", Y: "HALF_DAY", "-": "ABSENT",
+    "Yİ": "ANNUAL_LEAVE", "Üİ": "PAID_LEAVE", "Üsİ": "UNPAID_LEAVE", R: "SICK_LEAVE",
+    HT: "DAY_OFF", M: "REST_DAY_WORK",
+  };
+
+  const STATUS_HOURS: Record<AttendanceStatus, { totalHours: number; overtime: number }> = {
+    PRESENT: { totalHours: 8, overtime: 0 },
+    HALF_DAY: { totalHours: 4, overtime: 0 },
+    ABSENT: { totalHours: 0, overtime: 0 },
+    ANNUAL_LEAVE: { totalHours: 0, overtime: 0 },
+    PAID_LEAVE: { totalHours: 0, overtime: 0 },
+    UNPAID_LEAVE: { totalHours: 0, overtime: 0 },
+    SICK_LEAVE: { totalHours: 0, overtime: 0 },
+    DAY_OFF: { totalHours: 0, overtime: 0 },
+    REST_DAY_WORK: { totalHours: 8, overtime: 8 },
+  };
+
+  const importExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) { toast.error("Excel dosyası boş"); return; }
+
+      const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      if (raw.length < 2) { toast.error("Excel dosyasında veri bulunamadı"); return; }
+
+      // Header satırından gün sütunlarını bul
+      const headerRow = raw[0] as (string | number)[];
+      const nameColIdx = headerRow.findIndex((h) => String(h).toLowerCase().includes("ad soyad") || String(h).toLowerCase().includes("adsoyad"));
+      if (nameColIdx === -1) { toast.error("'Ad Soyad' sütunu bulunamadı"); return; }
+
+      // Gün numarası → sütun indeksi eşlemesi
+      const dayColMap = new Map<number, number>(); // dayNum → colIdx
+      headerRow.forEach((h, idx) => {
+        const num = Number(h);
+        if (!isNaN(num) && num >= 1 && num <= 31) dayColMap.set(num, idx);
+      });
+
+      if (dayColMap.size === 0) { toast.error("Tarih sütunları bulunamadı (1-31)"); return; }
+
+      // Çalışan isim → id eşlemesi
+      const workerMap = new Map<string, string>();
+      workers.forEach((w) => {
+        const fullName = `${w.firstName} ${w.lastName}`.trim().toLowerCase();
+        workerMap.set(fullName, w.id);
+      });
+
+      // Her gün için kayıtları topla
+      const dayRecords = new Map<string, { workerId: string; status: AttendanceStatus; totalHours: number; overtime: number }[]>();
+
+      let matchCount = 0;
+      let skipCount = 0;
+
+      for (let r = 1; r < raw.length; r++) {
+        const row = raw[r] as (string | number)[];
+        if (!row || row.length === 0) continue;
+
+        const name = String(row[nameColIdx] ?? "").trim().toLowerCase();
+        if (!name) continue;
+
+        const workerId = workerMap.get(name);
+        if (!workerId) { skipCount++; continue; }
+
+        matchCount++;
+
+        dayColMap.forEach((colIdx, dayNum) => {
+          const cellVal = String(row[colIdx] ?? "").trim().toUpperCase();
+          if (!cellVal || cellVal === "X") return;
+
+          const status = REVERSE_STATUS[cellVal];
+          if (!status) return;
+
+          const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+          if (!dayRecords.has(dateStr)) dayRecords.set(dateStr, []);
+          dayRecords.get(dateStr)!.push({
+            workerId,
+            status,
+            totalHours: STATUS_HOURS[status].totalHours,
+            overtime: STATUS_HOURS[status].overtime,
+          });
+        });
+      }
+
+      if (matchCount === 0) {
+        toast.error(`Eşleşen çalışan bulunamadı (${skipCount} atlandı). Ad Soyad sütununu kontrol edin.`);
+        return;
+      }
+
+      // API'ye gönder (gün gün)
+      let totalSaved = 0;
+      for (const [dateStr, records] of dayRecords) {
+        const res = await fetch("/api/puantaj", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: dateStr,
+            shift: "DAY",
+            records: records.map((r) => ({ ...r, shift: "DAY", note: "" })),
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          totalSaved += data.saved ?? 0;
+        }
+      }
+
+      toast.success(`${matchCount} çalışan, ${totalSaved} kayıt içe aktarıldı${skipCount > 0 ? ` (${skipCount} eşleşmedi)` : ""}`);
+      fetchData();
+    } catch (err) {
+      console.error("Excel import error:", err);
+      toast.error("Excel içe aktarma başarısız");
+    }
   };
 
   return (
@@ -249,7 +389,7 @@ function AylikPuantajPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Aylık Puantaj</h1>
-          <p className="text-muted-foreground text-sm">{monthName} - Aylık çalışma tablosu</p>
+          <p className="text-muted-foreground text-sm">{projectName} · {monthName}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => changeMonth(-1)}>
@@ -281,31 +421,15 @@ function AylikPuantajPage() {
         </Badge>
       </div>
 
-      {/* Ana Yüklenici / Taşeron Segment */}
-      <CompanyTypeSegment value={filterCompanyType} onChange={(v) => { setFilterCompanyType(v); setFilterCompany("all"); setFilterTeam("all"); }} />
-
       {/* Filtreler */}
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={filterProject} onValueChange={setFilterProject}>
-          <SelectTrigger className="w-52">
-            <FolderKanban className="h-4 w-4 mr-1.5 text-muted-foreground" />
-            <SelectValue placeholder="Proje" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tüm Projeler</SelectItem>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v); setFilterTeam("all"); }}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Firma" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tüm Firmalar</SelectItem>
-            {filteredCompanies.map((c) => (
+            {companies.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
           </SelectContent>
@@ -327,8 +451,12 @@ function AylikPuantajPage() {
 
         <div className="flex-1" />
 
+        <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={importExcel} />
+        <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+          <Upload className="h-4 w-4 mr-1" /> Excel İçe Aktar
+        </Button>
         <Button variant="outline" size="sm" onClick={exportExcel}>
-          <Download className="h-4 w-4 mr-1" /> Excel
+          <Download className="h-4 w-4 mr-1" /> Excel İndir
         </Button>
       </div>
 
@@ -397,7 +525,7 @@ function AylikPuantajPage() {
                             if (att) {
                               totalH += att.totalHours;
                               totalO += att.overtime;
-                              if (att.status === "PRESENT" || att.status === "HALF_DAY") presentDays++;
+                              if (att.status === "PRESENT" || att.status === "HALF_DAY" || att.status === "REST_DAY_WORK") presentDays++;
                             }
                             const status = att?.status ?? "ABSENT";
                             const weekend = isWeekend(dd);

@@ -52,7 +52,7 @@ import {
 import { toast } from "sonner";
 
 // ─── Tipler ──────────────────────────────────────────────
-type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "DAY_OFF";
+type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "DAY_OFF" | "REST_DAY_WORK";
 type ShiftType = "DAY" | "NIGHT";
 
 interface Team {
@@ -109,6 +109,7 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   HALF_DAY: "Yarım Gün",
   ABSENT: "Gelmedi",
   DAY_OFF: "Hafta Tatili",
+  REST_DAY_WORK: "H.Tatil Mesai",
 };
 
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
@@ -116,6 +117,7 @@ const STATUS_COLORS: Record<AttendanceStatus, string> = {
   HALF_DAY: "bg-blue-500",
   ABSENT: "bg-red-500",
   DAY_OFF: "bg-gray-400",
+  REST_DAY_WORK: "bg-orange-500",
 };
 
 function formatDate(date: Date): string {
@@ -221,6 +223,7 @@ function GunlukPuantaj({ projectId }: { projectId: string }) {
       if (field === "status") {
         if (value === "PRESENT") updated.totalHours = 8;
         else if (value === "HALF_DAY") updated.totalHours = 4;
+        else if (value === "REST_DAY_WORK") { updated.totalHours = 8; updated.overtime = 8; }
         else if (value === "ABSENT" || value === "DAY_OFF") {
           updated.totalHours = 0;
           updated.overtime = 0;
@@ -238,8 +241,8 @@ function GunlukPuantaj({ projectId }: { projectId: string }) {
         next[id] = {
           ...next[id],
           status,
-          totalHours: status === "PRESENT" ? 8 : status === "HALF_DAY" ? 4 : 0,
-          overtime: status === "ABSENT" || status === "DAY_OFF" ? 0 : next[id].overtime,
+          totalHours: status === "PRESENT" ? 8 : status === "HALF_DAY" ? 4 : status === "REST_DAY_WORK" ? 8 : 0,
+          overtime: status === "REST_DAY_WORK" ? 8 : (status === "ABSENT" || status === "DAY_OFF" ? 0 : next[id].overtime),
         };
       });
       return next;
@@ -288,7 +291,7 @@ function GunlukPuantaj({ projectId }: { projectId: string }) {
   // İstatistikler
   const stats = useMemo(() => {
     const total = Object.keys(editMap).length;
-    const present = Object.values(editMap).filter((r) => r.status === "PRESENT").length;
+    const present = Object.values(editMap).filter((r) => r.status === "PRESENT" || r.status === "REST_DAY_WORK").length;
     const halfDay = Object.values(editMap).filter((r) => r.status === "HALF_DAY").length;
     const absent = Object.values(editMap).filter((r) => r.status === "ABSENT").length;
     return { total, present, halfDay, absent };

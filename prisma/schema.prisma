@@ -310,25 +310,26 @@ model Team {
 
 // ─── ÇALIŞANLAR ──────────────────────────────────────────
 model Worker {
-  id               String    @id @default(cuid())
-  teamId           String    @map("team_id")
-  firstName        String    @map("first_name")
-  lastName         String    @map("last_name")
+  id               String      @id @default(cuid())
+  teamId           String      @map("team_id")
+  firstName        String      @map("first_name")
+  lastName         String      @map("last_name")
   role             String                               // Görevi (Kalıpçı, Formen, Elektrikçi vb.)
-  identityNo       String?   @map("identity_no")        // TC Kimlik No
+  collarType       CollarType  @default(BLUE) @map("collar_type") // Beyaz/Mavi Yaka
+  identityNo       String?     @map("identity_no")        // TC Kimlik No
   phone            String?                              // Telefon
-  dailyRate        Float?    @map("daily_rate")          // Günlük ücret
-  overtimeRate     Float?    @map("overtime_rate")       // Mesai saati ücreti
+  dailyRate        Float?      @map("daily_rate")          // Günlük ücret
+  overtimeRate     Float?      @map("overtime_rate")       // Mesai saati ücreti
   position         String?                              // Pozisyon/Unvan
-  bloodType        String?   @map("blood_type")          // Kan grubu
-  emergencyContact String?   @map("emergency_contact")   // Acil durum kişisi
-  emergencyPhone   String?   @map("emergency_phone")     // Acil durum tel
-  isActive         Boolean   @default(true) @map("is_active")
-  startDate        DateTime? @map("start_date") @db.Date // İşe başlama
-  endDate          DateTime? @map("end_date") @db.Date   // İşten çıkış
-  sortOrder        Int       @default(0) @map("sort_order")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  bloodType        String?     @map("blood_type")          // Kan grubu
+  emergencyContact String?     @map("emergency_contact")   // Acil durum kişisi
+  emergencyPhone   String?     @map("emergency_phone")     // Acil durum tel
+  isActive         Boolean     @default(true) @map("is_active")
+  startDate        DateTime?   @map("start_date") @db.Date // İşe başlama
+  endDate          DateTime?   @map("end_date") @db.Date   // İşten çıkış
+  sortOrder        Int         @default(0) @map("sort_order")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
   team          Team           @relation(fields: [teamId], references: [id], onDelete: Restrict)
   attendances   Attendance[]
@@ -337,6 +338,11 @@ model Worker {
   projectAssignments ProjectWorkerAssignment[]
 
   @@map("workers")
+}
+
+enum CollarType {
+  WHITE  // Beyaz Yaka
+  BLUE   // Mavi Yaka
 }
 
 // ─── PROJE-ÇALIŞAN ATAMASI ──────────────────────────────
@@ -408,6 +414,7 @@ enum AttendanceStatus {
   ANNUAL_LEAVE  // Yıllık izin
   SICK_LEAVE    // Raporlu
   DAY_OFF       // Hafta tatili
+  REST_DAY_WORK // Hafta tatili mesaisi
 }
 
 // ─── İŞÇİ İZİN TALEPLERİ (PUANTAJ) ─────────────────────
@@ -2319,4 +2326,21 @@ model MeetingComment {
   item      MeetingItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@map("meeting_comments")
+}
+
+// ─── ÇALIŞAN İNDİRİMLERİ ─────────────────────────────────
+model EmployeeDiscount {
+  id            String   @id @default(cuid())
+  companyName   String   @map("company_name")          // Firma adı (Starbucks, LC Waikiki vb.)
+  category      String                                  // Kategori (Gıda, Giyim, Teknoloji vb.)
+  discountRate  Int      @map("discount_rate")           // İndirim yüzdesi
+  description   String?  @db.Text                       // Açıklama
+  logo          String?                                  // Logo URL (opsiyonel)
+  contactInfo   String?  @map("contact_info")            // İletişim bilgisi
+  validUntil    DateTime? @map("valid_until") @db.Date   // Geçerlilik tarihi
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("employee_discounts")
 }

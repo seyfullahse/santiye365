@@ -104,7 +104,7 @@ export default function PuantajRaporPage() {
               }
               const s = summaryMap.get(wid)!;
               for (const att of worker.attendances) {
-                if (att.status === "PRESENT" || att.status === "HALF_DAY") {
+                if (att.status === "PRESENT" || att.status === "HALF_DAY" || att.status === "REST_DAY_WORK") {
                   s.presentDays++;
                 }
                 s.totalHours += att.totalHours ?? 0;

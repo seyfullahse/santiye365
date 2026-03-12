@@ -19,13 +19,23 @@ export async function GET(
     const parsedStart = new Date(date + "T00:00:00.000Z");
     const parsedEnd = endDate ? new Date(endDate + "T00:00:00.000Z") : parsedStart;
 
-    // Projeye atanmış aktif çalışanları getir
+    // 1) ProjectWorkerAssignment ile atanmış çalışanlar
     const assignments = await prisma.projectWorkerAssignment.findMany({
       where: { projectId, isActive: true },
       select: { workerId: true },
     });
+    const assignmentIds = assignments.map((a: { workerId: string }) => a.workerId);
 
-    const assignedWorkerIds = assignments.map((a) => a.workerId);
+    // 2) Team.projectId üzerinden ilişkili çalışanlar
+    const teamWorkers = await prisma.worker.findMany({
+      where: { isActive: true, team: { projectId } },
+      select: { id: true },
+    });
+    const teamWorkerIds = teamWorkers.map((w: { id: string }) => w.id);
+
+    // İki kaynağı birleştir (union)
+    const idSet = new Set([...assignmentIds, ...teamWorkerIds]);
+    const assignedWorkerIds = Array.from(idSet);
 
     if (assignedWorkerIds.length === 0) {
       return NextResponse.json([]);
@@ -59,14 +69,16 @@ export async function GET(
       ],
     });
 
-    const result = workers.map((w) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = workers.map((w: any) => ({
       id: w.id,
       firstName: w.firstName,
       lastName: w.lastName,
       role: w.role,
       sortOrder: w.sortOrder,
       team: w.team,
-      attendances: w.attendances.map((att) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      attendances: w.attendances.map((att: any) => ({
         id: att.id,
         date: att.date.toISOString().slice(0, 10),
         shift: att.shift,
@@ -110,12 +122,19 @@ export async function POST(
       return NextResponse.json({ error: "Tarih ve kayıtlar gereklidir" }, { status: 400 });
     }
 
-    // Sadece projeye atanmış çalışanlar için kayıt yapılabilir
+    // Projeye atanmış çalışanlar (her iki kaynak)
     const assignments = await prisma.projectWorkerAssignment.findMany({
       where: { projectId, isActive: true },
       select: { workerId: true },
     });
-    const assignedIds = new Set(assignments.map((a) => a.workerId));
+    const teamWorkers = await prisma.worker.findMany({
+      where: { isActive: true, team: { projectId } },
+      select: { id: true },
+    });
+    const assignedIds = new Set([
+      ...assignments.map((a: { workerId: string }) => a.workerId),
+      ...teamWorkers.map((w: { id: string }) => w.id),
+    ]);
 
     const parsedDate = new Date(date + "T00:00:00.000Z");
 

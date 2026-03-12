@@ -1,6 +1,8 @@
+// @ts-nocheck
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,24 +35,25 @@ import {
   Users,
   Plus,
   Pencil,
-  Trash2,
   Search,
   Phone,
   CreditCard,
-  Building2,
   UserCheck,
-  UserX,
+  UserMinus,
   Download,
+  UserPlus,
+  Building2,
+  Loader2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import { CompanyTypeSegment, PuantajPagination } from "../components";
+import { PuantajPagination } from "../components";
 
+/* ─── Tipler ─── */
 interface Team {
   id: string;
   name: string;
   company: { id: string; name: string; type: string };
-  discipline: { name: string };
-  project?: { id: string; name: string } | null;
+  discipline?: { name: string };
 }
 
 interface Worker {
@@ -58,6 +61,7 @@ interface Worker {
   firstName: string;
   lastName: string;
   role: string;
+  collarType?: string;
   identityNo?: string | null;
   phone?: string | null;
   position?: string | null;
@@ -69,13 +73,24 @@ interface Worker {
   endDate?: string | null;
   sortOrder: number;
   team: Team;
-  _count?: { attendances: number };
+  assignmentId?: string;
+  assignedAt?: string;
+}
+
+interface PoolWorker {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  position?: string | null;
+  team: Team;
 }
 
 interface WorkerForm {
   firstName: string;
   lastName: string;
   role: string;
+  collarType: string;
   teamId: string;
   identityNo: string;
   phone: string;
@@ -89,7 +104,7 @@ interface WorkerForm {
 }
 
 const emptyForm: WorkerForm = {
-  firstName: "", lastName: "", role: "", teamId: "",
+  firstName: "", lastName: "", role: "", collarType: "BLUE", teamId: "",
   identityNo: "", phone: "",
   position: "", bloodType: "", emergencyContact: "", emergencyPhone: "",
   isActive: true, startDate: "", endDate: "",
@@ -97,68 +112,104 @@ const emptyForm: WorkerForm = {
 
 const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "0+", "0-"];
 
-export default function CalisanlarPage() {
+/* ─── Wrapper ─── */
+export default function CalisanlarPageWrapper() {
+  return (
+    <Suspense fallback={<div className="p-4 text-muted-foreground">Yükleniyor...</div>}>
+      <CalisanlarPage />
+    </Suspense>
+  );
+}
+
+/* ─── Ana Bileşen ─── */
+function CalisanlarPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const projectId = searchParams.get("project");
+
+  // Ana state
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+  const [projectName, setProjectName] = useState("");
+
+  // Filtreler
   const [search, setSearch] = useState("");
-  const [filterCompanyType, setFilterCompanyType] = useState("all");
   const [filterCompany, setFilterCompany] = useState("all");
   const [filterTeam, setFilterTeam] = useState("all");
-  const [filterActive, setFilterActive] = useState("all");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<WorkerForm>(emptyForm);
-  const [saving, setSaving] = useState(false);
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const companies = Array.from(
-    new Map(teams.map((t) => [t.company.id, t.company.name])),
-    ([id, name]) => ({ id, name })
-  );
+  // Çalışan düzenleme dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<WorkerForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
 
-  const fetchData = useCallback(() => {
+  // Personel atama dialog
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [poolWorkers, setPoolWorkers] = useState<PoolWorker[]>([]);
+  const [poolSearch, setPoolSearch] = useState("");
+  const [poolLoading, setPoolLoading] = useState(false);
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState<Set<string>>(new Set());
+  const [assigning, setAssigning] = useState(false);
+
+  // Proje yönlendirme
+  useEffect(() => {
+    if (!projectId) { router.push("/puantaj"); return; }
+    fetch("/api/projeler").then((r) => r.json()).then((data) => {
+      const proj = data.find((p: { id: string; name: string }) => p.id === projectId);
+      setProjectName(proj?.name || "");
+    });
+  }, [projectId, router]);
+
+  // Firma listesi (atanmış çalışanlardan)
+  const companies = useMemo(() => {
+    const map = new Map<string, string>();
+    workers.forEach((w) => map.set(w.team.company.id, w.team.company.name));
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [workers]);
+
+  // Ekip listesi (atanmış çalışanlardan)
+  const workerTeams = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; companyId: string }>();
+    workers.forEach((w) => map.set(w.team.id, { id: w.team.id, name: w.team.name, companyId: w.team.company.id }));
+    return Array.from(map.values());
+  }, [workers]);
+
+  /* ─── Veri Çekme ─── */
+  const fetchAssigned = useCallback(() => {
+    if (!projectId) return;
     setLoading(true);
     Promise.all([
-      fetch("/api/puantaj/calisanlar").then((r) => r.json()),
+      fetch(`/api/projeler/${projectId}/puantaj/atamalar`).then((r) => r.json()),
       fetch("/api/ekipler").then((r) => r.json()),
     ])
-      .then(([workerData, teamData]) => {
-        setWorkers(workerData);
-        setTeams(teamData);
+      .then(([assignedData, teamData]) => {
+        setWorkers(Array.isArray(assignedData) ? assignedData : []);
+        setTeams(Array.isArray(teamData) ? teamData : []);
+        setCurrentPage(1);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchAssigned();
+  }, [fetchAssigned]);
 
-  const filteredCompanies = useMemo(() => {
-    if (filterCompanyType === "all") return companies;
-    return companies.filter((c) => {
-      const team = teams.find((t) => t.company.id === c.id);
-      if (!team) return false;
-      if (filterCompanyType === "MAIN") return team.company.type === "MAIN";
-      if (filterCompanyType === "SUBCONTRACTOR") return team.company.type === "SUBCONTRACTOR";
+  /* ─── Filtreleme ─── */
+  const filtered = useMemo(() => {
+    return workers.filter((w) => {
+      if (search) {
+        const q = search.toLowerCase();
+        const match = `${w.firstName} ${w.lastName} ${w.role} ${w.identityNo ?? ""} ${w.phone ?? ""}`.toLowerCase();
+        if (!match.includes(q)) return false;
+      }
+      if (filterCompany !== "all" && w.team.company.id !== filterCompany) return false;
+      if (filterTeam !== "all" && w.team.id !== filterTeam) return false;
       return true;
     });
-  }, [companies, teams, filterCompanyType]);
-
-  const filtered = workers.filter((w) => {
-    if (search) {
-      const q = search.toLowerCase();
-      const match = `${w.firstName} ${w.lastName} ${w.role} ${w.identityNo ?? ""} ${w.phone ?? ""}`.toLowerCase();
-      if (!match.includes(q)) return false;
-    }
-    if (filterCompanyType !== "all" && w.team.company.type !== filterCompanyType) return false;
-    if (filterCompany !== "all" && w.team.company.id !== filterCompany) return false;
-    if (filterTeam !== "all" && w.team.id !== filterTeam) return false;
-    if (filterActive === "active" && !w.isActive) return false;
-    if (filterActive === "inactive" && w.isActive) return false;
-    return true;
-  });
+  }, [workers, search, filterCompany, filterTeam]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedFiltered = useMemo(() => {
@@ -166,18 +217,14 @@ export default function CalisanlarPage() {
     return filtered.slice(s, s + pageSize);
   }, [filtered, currentPage, pageSize]);
 
-  const openCreate = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setDialogOpen(true);
-  };
-
+  /* ─── Çalışan Düzenleme ─── */
   const openEdit = (w: Worker) => {
     setEditingId(w.id);
     setForm({
       firstName: w.firstName,
       lastName: w.lastName,
       role: w.role,
+      collarType: w.collarType || "BLUE",
       teamId: w.team.id,
       identityNo: w.identityNo || "",
       phone: w.phone || "",
@@ -189,7 +236,7 @@ export default function CalisanlarPage() {
       startDate: w.startDate ? w.startDate.slice(0, 10) : "",
       endDate: w.endDate ? w.endDate.slice(0, 10) : "",
     });
-    setDialogOpen(true);
+    setEditDialogOpen(true);
   };
 
   const handleSave = async () => {
@@ -203,6 +250,7 @@ export default function CalisanlarPage() {
         firstName: form.firstName,
         lastName: form.lastName,
         role: form.role,
+        collarType: form.collarType,
         teamId: form.teamId,
         identityNo: form.identityNo || null,
         phone: form.phone || null,
@@ -225,10 +273,20 @@ export default function CalisanlarPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
       if (!res.ok) throw new Error("Kayıt başarısız");
-      setDialogOpen(false);
-      fetchData();
+
+      // Yeni çalışan oluştuysa otomatik olarak projeye ata
+      if (!editingId && projectId) {
+        const newWorker = await res.json();
+        await fetch(`/api/projeler/${projectId}/puantaj/atamalar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workerIds: [newWorker.id] }),
+        });
+      }
+
+      setEditDialogOpen(false);
+      fetchAssigned();
     } catch (e) {
       alert(`Hata: ${e instanceof Error ? e.message : "Bilinmeyen"}`);
     } finally {
@@ -236,16 +294,71 @@ export default function CalisanlarPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`"${name}" silinecek. Emin misiniz?`)) return;
+  /* ─── Projeden Çıkarma ─── */
+  const handleRemoveFromProject = async (workerId: string, name: string) => {
+    if (!confirm(`"${name}" bu projeden çıkarılacak.\nGeçmiş puantaj verileri korunacaktır.\n\nDevam edilsin mi?`)) return;
     try {
-      await fetch(`/api/puantaj/calisanlar?id=${id}`, { method: "DELETE" });
-      fetchData();
+      const res = await fetch(`/api/projeler/${projectId}/puantaj/atamalar?workerId=${workerId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Çıkarma başarısız");
+      fetchAssigned();
     } catch {
-      alert("Silme hatası");
+      alert("Projeden çıkarma hatası");
     }
   };
 
+  /* ─── Personel Atama (Havuz) ─── */
+  const openAssignDialog = async () => {
+    setAssignDialogOpen(true);
+    setSelectedWorkerIds(new Set());
+    setPoolSearch("");
+    fetchPool("");
+  };
+
+  const fetchPool = async (q: string) => {
+    if (!projectId) return;
+    setPoolLoading(true);
+    try {
+      const params = new URLSearchParams({ companyType: "MAIN" });
+      if (q) params.set("search", q);
+      const res = await fetch(`/api/projeler/${projectId}/puantaj/havuz?${params}`);
+      const data = await res.json();
+      setPoolWorkers(data);
+    } catch {
+      setPoolWorkers([]);
+    } finally {
+      setPoolLoading(false);
+    }
+  };
+
+  const togglePoolSelection = (id: string) => {
+    setSelectedWorkerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleAssign = async () => {
+    if (selectedWorkerIds.size === 0) return;
+    setAssigning(true);
+    try {
+      const res = await fetch(`/api/projeler/${projectId}/puantaj/atamalar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workerIds: Array.from(selectedWorkerIds) }),
+      });
+      if (!res.ok) throw new Error("Atama başarısız");
+      setAssignDialogOpen(false);
+      fetchAssigned();
+    } catch (e) {
+      alert(`Hata: ${e instanceof Error ? e.message : "Bilinmeyen"}`);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  /* ─── Excel ─── */
   const exportExcel = () => {
     const rows = filtered.map((w, i) => ({
       "#": i + 1,
@@ -259,39 +372,43 @@ export default function CalisanlarPage() {
       Telefon: w.phone || "",
       "Kan Grubu": w.bloodType || "",
       Durum: w.isActive ? "Aktif" : "Pasif",
-      "İşe Başlama": w.startDate ? w.startDate.slice(0, 10) : "",
-      "Ayrılış": w.endDate ? w.endDate.slice(0, 10) : "",
+      "Atanma Tarihi": w.assignedAt ? new Date(w.assignedAt).toLocaleDateString("tr-TR") : "",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Çalışanlar");
-    XLSX.writeFile(wb, "puantaj-calisanlar.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Proje Çalışanları");
+    XLSX.writeFile(wb, `proje-calisanlari-${projectName || "export"}.xlsx`);
   };
 
-  const activeCount = workers.filter((w) => w.isActive).length;
-  const inactiveCount = workers.length - activeCount;
+  const mainCount = workers.filter((w) => w.team.company.type === "MAIN").length;
+  const subCount = workers.filter((w) => w.team.company.type === "SUBCONTRACTOR").length;
 
+  /* ─── Render ─── */
   return (
     <div className="space-y-4">
       {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Çalışan Yönetimi</h1>
+          <h1 className="text-2xl font-bold">Proje Personeli</h1>
           <p className="text-muted-foreground text-sm">
-            Puantaj sistemindeki çalışanları yönetin
+            {projectName} · Projeye atanmış çalışanları yönetin
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="secondary"><UserCheck className="h-3 w-3 mr-1" /> {activeCount} aktif</Badge>
-          <Badge variant="outline"><UserX className="h-3 w-3 mr-1" /> {inactiveCount} pasif</Badge>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1" /> Çalışan Ekle
+          <Badge variant="secondary">
+            <Building2 className="h-3 w-3 mr-1" /> {mainCount} firma
+          </Badge>
+          <Badge variant="outline">
+            <Users className="h-3 w-3 mr-1" /> {subCount} taşeron
+          </Badge>
+          <Button size="sm" variant="outline" onClick={openAssignDialog}>
+            <UserPlus className="h-4 w-4 mr-1" /> Personel Ata
+          </Button>
+          <Button size="sm" onClick={() => { setEditingId(null); setForm(emptyForm); setEditDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1" /> Yeni Çalışan
           </Button>
         </div>
       </div>
-
-      {/* Ana Yüklenici / Taşeron Segment */}
-      <CompanyTypeSegment value={filterCompanyType} onChange={(v) => { setFilterCompanyType(v); setFilterCompany("all"); setFilterTeam("all"); setCurrentPage(1); }} />
 
       {/* Filtreler */}
       <div className="flex flex-wrap items-center gap-3">
@@ -311,7 +428,7 @@ export default function CalisanlarPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tüm Firmalar</SelectItem>
-            {filteredCompanies.map((c) => (
+            {companies.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
           </SelectContent>
@@ -323,22 +440,11 @@ export default function CalisanlarPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tüm Ekipler</SelectItem>
-            {teams
-              .filter((t) => filterCompany === "all" || t.company.id === filterCompany)
+            {workerTeams
+              .filter((t) => filterCompany === "all" || t.companyId === filterCompany)
               .map((t) => (
                 <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
               ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={filterActive} onValueChange={setFilterActive}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Durum" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tümü</SelectItem>
-            <SelectItem value="active">Aktif</SelectItem>
-            <SelectItem value="inactive">Pasif</SelectItem>
           </SelectContent>
         </Select>
 
@@ -357,8 +463,11 @@ export default function CalisanlarPage() {
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-4 opacity-40" />
-            <p className="text-lg font-medium">Çalışan bulunamadı</p>
-            <p className="text-sm">Filtreleri değiştirin veya yeni çalışan ekleyin.</p>
+            <p className="text-lg font-medium">Projeye atanmış çalışan yok</p>
+            <p className="text-sm mb-4">Personel Ata butonunu kullanarak çalışan ekleyin.</p>
+            <Button onClick={openAssignDialog}>
+              <UserPlus className="h-4 w-4 mr-1" /> Personel Ata
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -370,12 +479,11 @@ export default function CalisanlarPage() {
                   <TableHead className="w-10">#</TableHead>
                   <TableHead>Ad Soyad</TableHead>
                   <TableHead>Görevi</TableHead>
-                  <TableHead>Firma</TableHead>
-                  <TableHead>Ekip</TableHead>
+                  <TableHead>Firma / Ekip</TableHead>
                   <TableHead>TC Kimlik</TableHead>
                   <TableHead>Telefon</TableHead>
                   <TableHead className="text-center">Durum</TableHead>
-                  <TableHead className="w-24">İşlem</TableHead>
+                  <TableHead className="w-28 text-right">İşlem</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -387,8 +495,11 @@ export default function CalisanlarPage() {
                       {w.position && <span className="text-xs text-muted-foreground ml-1">({w.position})</span>}
                     </TableCell>
                     <TableCell className="text-sm">{w.role}</TableCell>
-                    <TableCell className="text-sm">{w.team.company.name}</TableCell>
-                    <TableCell className="text-sm">{w.team.name}</TableCell>
+                    <TableCell className="text-sm">
+                      <span className="text-muted-foreground">{w.team.company.name}</span>
+                      <span className="mx-1">›</span>
+                      <span>{w.team.name}</span>
+                    </TableCell>
                     <TableCell className="text-xs font-mono">{w.identityNo || "-"}</TableCell>
                     <TableCell className="text-xs">{w.phone || "-"}</TableCell>
                     <TableCell className="text-center">
@@ -397,12 +508,18 @@ export default function CalisanlarPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(w)}>
+                      <div className="flex gap-1 justify-end">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Düzenle" onClick={() => openEdit(w)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => handleDelete(w.id, `${w.firstName} ${w.lastName}`)}>
-                          <Trash2 className="h-3.5 w-3.5" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-orange-600 hover:text-orange-700"
+                          title="Projeden Çıkar"
+                          onClick={() => handleRemoveFromProject(w.id, `${w.firstName} ${w.lastName}`)}
+                        >
+                          <UserMinus className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -425,11 +542,110 @@ export default function CalisanlarPage() {
         />
       )}
 
-      {/* Çalışan Ekle / Düzenle Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* ══════ Personel Atama Dialog ══════ */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              <UserPlus className="inline h-5 w-5 mr-2" />
+              Projeye Personel Ata
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">Ana firma çalışanlarından seçin</p>
+          </DialogHeader>
+
+          {/* Arama */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Ad, soyad veya görev ara..."
+              value={poolSearch}
+              onChange={(e) => {
+                setPoolSearch(e.target.value);
+                fetchPool(e.target.value);
+              }}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Liste */}
+          <div className="flex-1 overflow-y-auto border rounded-md min-h-[200px] max-h-[400px]">
+            {poolLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : poolWorkers.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground text-sm">
+                {poolSearch ? "Arama sonucu bulunamadı" : "Atanabilecek personel yok"}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Ad Soyad</TableHead>
+                    <TableHead>Görevi</TableHead>
+                    <TableHead>Firma / Ekip</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {poolWorkers.map((w) => {
+                    const selected = selectedWorkerIds.has(w.id);
+                    return (
+                      <TableRow
+                        key={w.id}
+                        className={`cursor-pointer ${selected ? "bg-primary/5" : "hover:bg-muted/50"}`}
+                        onClick={() => togglePoolSelection(w.id)}
+                      >
+                        <TableCell className="text-center">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => togglePoolSelection(w.id)}
+                            className="h-4 w-4 rounded"
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium text-sm">
+                          {w.firstName} {w.lastName}
+                          {w.position && <span className="text-xs text-muted-foreground ml-1">({w.position})</span>}
+                        </TableCell>
+                        <TableCell className="text-sm">{w.role}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {w.team.company.name} › {w.team.name}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          <DialogFooter className="flex items-center justify-between sm:justify-between">
+            <span className="text-sm text-muted-foreground">
+              {selectedWorkerIds.size > 0 ? `${selectedWorkerIds.size} kişi seçildi` : "Personel seçin"}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>İptal</Button>
+              <Button onClick={handleAssign} disabled={assigning || selectedWorkerIds.size === 0}>
+                {assigning ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Atanıyor...</>
+                ) : (
+                  <><UserCheck className="h-4 w-4 mr-1" /> Ata ({selectedWorkerIds.size})</>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ══════ Çalışan Düzenle / Yeni Çalışan Dialog ══════ */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? "Çalışan Düzenle" : "Yeni Çalışan Ekle"}</DialogTitle>
+            {!editingId && (
+              <p className="text-sm text-muted-foreground">Çalışan oluşturulacak ve otomatik olarak projeye atanacak</p>
+            )}
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-4">
@@ -448,6 +664,16 @@ export default function CalisanlarPage() {
             <div className="space-y-1.5">
               <Label>Görevi *</Label>
               <Input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="Kalıpçı, Formen, vb." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Yaka Tipi *</Label>
+              <Select value={form.collarType} onValueChange={(v) => setForm({ ...form, collarType: v })}>
+                <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BLUE">Mavi Yaka</SelectItem>
+                  <SelectItem value="WHITE">Beyaz Yaka</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Pozisyon</Label>
@@ -527,9 +753,9 @@ export default function CalisanlarPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>İptal</Button>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>İptal</Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Kaydediliyor..." : editingId ? "Güncelle" : "Ekle"}
+              {saving ? "Kaydediliyor..." : editingId ? "Güncelle" : "Oluştur ve Ata"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -36,14 +36,12 @@ import {
   CalendarDays,
   Sun,
   Moon,
-  FolderKanban,
+  HardHat,
 } from "lucide-react";
 import { PuantajPagination } from "../components";
 import * as XLSX from "xlsx";
-import Link from "next/link";
 
-// ─── Tipler ──────────────────────────────────────────────
-type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "ANNUAL_LEAVE" | "PAID_LEAVE" | "UNPAID_LEAVE" | "SICK_LEAVE" | "DAY_OFF" | "REST_DAY_WORK";
+type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "DAY_OFF" | "REST_DAY_WORK";
 type ShiftType = "DAY" | "NIGHT";
 
 interface Team {
@@ -87,10 +85,6 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   PRESENT: "Geldi",
   HALF_DAY: "Yarım Gün",
   ABSENT: "Gelmedi",
-  ANNUAL_LEAVE: "Yıllık İzin",
-  PAID_LEAVE: "Ücretli İzin",
-  UNPAID_LEAVE: "Ücretsiz İzin",
-  SICK_LEAVE: "Raporlu",
   DAY_OFF: "Hafta Tatili",
   REST_DAY_WORK: "H.Tatil Mesai",
 };
@@ -99,10 +93,6 @@ const STATUS_COLORS: Record<AttendanceStatus, string> = {
   PRESENT: "bg-green-500",
   HALF_DAY: "bg-blue-500",
   ABSENT: "bg-red-500",
-  ANNUAL_LEAVE: "bg-amber-500",
-  PAID_LEAVE: "bg-teal-500",
-  UNPAID_LEAVE: "bg-orange-500",
-  SICK_LEAVE: "bg-purple-500",
   DAY_OFF: "bg-gray-400",
   REST_DAY_WORK: "bg-orange-500",
 };
@@ -133,15 +123,15 @@ function formatTurkishDate(dateStr: string): string {
   });
 }
 
-export default function GunlukPuantajPageWrapper() {
+export default function TaseronPuantajWrapper() {
   return (
     <Suspense fallback={<div className="p-4 text-muted-foreground">Yükleniyor...</div>}>
-      <GunlukPuantajPage />
+      <TaseronPuantajPage />
     </Suspense>
   );
 }
 
-function GunlukPuantajPage() {
+function TaseronPuantajPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const projectId = searchParams.get("project");
@@ -161,12 +151,10 @@ function GunlukPuantajPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const dateRef = useRef<HTMLInputElement>(null);
 
-  // Proje seçilmemişse ana sayfaya yönlendir
   useEffect(() => {
     if (!projectId) router.push("/puantaj");
   }, [projectId, router]);
 
-  // Proje adı ve ekipler (sadece MAIN)
   useEffect(() => {
     if (!projectId) return;
     Promise.all([
@@ -175,15 +163,14 @@ function GunlukPuantajPage() {
     ]).then(([projData, teamData]) => {
       const proj = projData.find((p: { id: string; name: string }) => p.id === projectId);
       setProjectName(proj?.name || "");
-      const mainTeams = teamData.filter((t: Team) => t.company.type === "MAIN");
-      setTeams(mainTeams);
+      const subTeams = teamData.filter((t: Team) => t.company.type === "SUBCONTRACTOR");
+      setTeams(subTeams);
       const compMap = new Map<string, string>();
-      mainTeams.forEach((t: Team) => compMap.set(t.company.id, t.company.name));
+      subTeams.forEach((t: Team) => compMap.set(t.company.id, t.company.name));
       setCompanies(Array.from(compMap, ([id, name]) => ({ id, name })));
     });
   }, [projectId]);
 
-  // Puantaj verilerini yükle
   const fetchData = useCallback(() => {
     if (!projectId) return;
     setLoading(true);
@@ -192,7 +179,7 @@ function GunlukPuantajPage() {
       endDate: date,
       shift: "all",
       projectId,
-      companyType: "MAIN",
+      companyType: "SUBCONTRACTOR",
     });
     if (filterTeam !== "all") params.set("teamId", filterTeam);
     if (filterCompany !== "all") params.set("companyId", filterCompany);
@@ -225,7 +212,6 @@ function GunlukPuantajPage() {
     fetchData();
   }, [fetchData]);
 
-  // ─── Edit yardımcıları ────────────────────────────────
   const updateRow = (workerId: string, patch: Partial<EditRow>) => {
     setEditRows((prev) => {
       const next = new Map(prev);
@@ -270,7 +256,6 @@ function GunlukPuantajPage() {
     setHasChanges(true);
   };
 
-  // ─── Kaydet ──────────────────────────────────────────
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -297,25 +282,23 @@ function GunlukPuantajPage() {
     }
   };
 
-  // ─── Tarih navigasyonu ───────────────────────────────
   const changeDate = (offset: number) => {
     const d = new Date(date + "T00:00:00");
     d.setDate(d.getDate() + offset);
     setDate(formatDate(d));
   };
 
-  // ─── Excel dışa aktar ───────────────────────────────
   const exportExcel = () => {
     const rows = workers.map((w, i) => {
       const row = editRows.get(w.id);
       return {
         "#": i + 1,
-        Şirket: w.team.company.name,
+        Taşeron: w.team.company.name,
         Ekip: w.team.name,
         "Ad Soyad": `${w.firstName} ${w.lastName}`,
         Görevi: w.role,
         Vardiya: row?.shift === "NIGHT" ? "Gece" : "Gündüz",
-        Durum: row ? STATUS_LABELS[row.status] : "Gelmedi",
+        Durum: row ? STATUS_LABELS[row.status] : "Yok",
         "Çalışma Saati": row?.totalHours ?? 0,
         "Mesai Saati": row?.overtime ?? 0,
         Not: row?.note ?? "",
@@ -323,27 +306,24 @@ function GunlukPuantajPage() {
     });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Firma Puantaj");
-    XLSX.writeFile(wb, `firma-puantaj-${date}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Taşeron Puantaj");
+    XLSX.writeFile(wb, `taseron-puantaj-${date}.xlsx`);
   };
 
-  // ─── İstatistikler ──────────────────────────────────
   const stats = useMemo(() => {
-    let total = 0, present = 0, absent = 0, halfDay = 0, dayOff = 0, leave = 0, totalHours = 0, totalOvertime = 0;
+    let total = 0, present = 0, absent = 0, halfDay = 0, dayOff = 0, totalHours = 0, totalOvertime = 0;
     editRows.forEach((r) => {
       total++;
-      if (r.status === "PRESENT" || r.status === "REST_DAY_WORK") present++;
+      if (r.status === "PRESENT") present++;
       else if (r.status === "ABSENT") absent++;
       else if (r.status === "HALF_DAY") halfDay++;
       else if (r.status === "DAY_OFF") dayOff++;
-      else if (["ANNUAL_LEAVE", "PAID_LEAVE", "UNPAID_LEAVE", "SICK_LEAVE"].includes(r.status)) leave++;
       totalHours += r.totalHours;
       totalOvertime += r.overtime;
     });
-    return { total, present, absent, halfDay, dayOff, leave, totalHours, totalOvertime };
+    return { total, present, absent, halfDay, dayOff, totalHours, totalOvertime };
   }, [editRows]);
 
-  // Firmaya göre gruplanmış çalışanlar (sayfalanmış)
   const totalPages = Math.max(1, Math.ceil(workers.length / pageSize));
   const paginatedGroupedWorkers = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -363,10 +343,12 @@ function GunlukPuantajPage() {
 
   return (
     <div className="space-y-4">
-      {/* Başlık + Tarih */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Firma Puantaj</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <HardHat className="h-6 w-6" />
+            Taşeron Puantaj
+          </h1>
           <p className="text-muted-foreground text-sm">
             {projectName} · <CalendarDays className="inline h-4 w-4 mr-1" />
             {formatDisplayDate(new Date(date + "T00:00:00"))}
@@ -387,25 +369,22 @@ function GunlukPuantajPage() {
         </div>
       </div>
 
-      {/* İstatistik kartları */}
-      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         <MiniStat icon={<Users className="h-3.5 w-3.5" />} value={stats.total} label="Toplam" />
         <MiniStat icon={<UserCheck className="h-3.5 w-3.5 text-green-600" />} value={stats.present} label="Geldi" color="text-green-600" />
-        <MiniStat icon={<UserX className="h-3.5 w-3.5 text-red-600" />} value={stats.absent} label="Gelmedi" color="text-red-600" />
         <MiniStat icon={<Clock className="h-3.5 w-3.5 text-blue-600" />} value={stats.halfDay} label="Yarım Gün" color="text-blue-600" />
-        <MiniStat icon={<Clock className="h-3.5 w-3.5 text-amber-600" />} value={stats.leave} label="İzinli" color="text-amber-600" />
         <MiniStat icon={<Clock className="h-3.5 w-3.5 text-gray-500" />} value={stats.dayOff} label="H. Tatili" color="text-gray-500" />
+        <MiniStat icon={<Clock className="h-3.5 w-3.5" />} value={stats.totalHours} label="Saat" />
         <MiniStat icon={<Clock className="h-3.5 w-3.5 text-orange-600" />} value={stats.totalOvertime} label="Mesai" color="text-orange-600" />
       </div>
 
-      {/* Filtreler */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v); setFilterTeam("all"); }}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="Firma" />
+            <SelectValue placeholder="Taşeron" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tüm Firmalar</SelectItem>
+            <SelectItem value="all">Tüm Taşeronlar</SelectItem>
             {companies.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
@@ -443,7 +422,6 @@ function GunlukPuantajPage() {
         </Button>
       </div>
 
-      {/* Tablo */}
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -453,9 +431,9 @@ function GunlukPuantajPage() {
       ) : workers.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground">
-            <Users className="h-12 w-12 mx-auto mb-4 opacity-40" />
-            <p className="text-lg font-medium">Çalışan bulunamadı</p>
-            <p className="text-sm">Bu projeye atanmış ana yüklenici çalışanı bulunmuyor.</p>
+            <HardHat className="h-12 w-12 mx-auto mb-4 opacity-40" />
+            <p className="text-lg font-medium">Taşeron çalışanı bulunamadı</p>
+            <p className="text-sm">Bu projeye atanmış taşeron çalışanı bulunmuyor.</p>
           </CardContent>
         </Card>
       ) : (
@@ -466,7 +444,7 @@ function GunlukPuantajPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">#</TableHead>
-                  <TableHead className="w-32">Firma</TableHead>
+                  <TableHead className="w-32">Taşeron</TableHead>
                   <TableHead className="w-28">Ekip</TableHead>
                   <TableHead>Ad Soyad</TableHead>
                   <TableHead className="w-28">Görevi</TableHead>
@@ -498,28 +476,16 @@ function GunlukPuantajPage() {
                           <TableCell className="text-xs text-muted-foreground">{w.role}</TableCell>
                           <TableCell>
                             <Select value={row.shift} onValueChange={(v) => changeShift(w.id, v as ShiftType)}>
-                              <SelectTrigger className="h-8 w-24">
-                                <SelectValue />
-                              </SelectTrigger>
+                              <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="DAY">
-                                  <div className="flex items-center gap-1.5">
-                                    <Sun className="h-3 w-3 text-yellow-500" /> Gündüz
-                                  </div>
-                                </SelectItem>
-                                <SelectItem value="NIGHT">
-                                  <div className="flex items-center gap-1.5">
-                                    <Moon className="h-3 w-3 text-blue-400" /> Gece
-                                  </div>
-                                </SelectItem>
+                                <SelectItem value="DAY"><div className="flex items-center gap-1.5"><Sun className="h-3 w-3 text-yellow-500" /> Gündüz</div></SelectItem>
+                                <SelectItem value="NIGHT"><div className="flex items-center gap-1.5"><Moon className="h-3 w-3 text-blue-400" /> Gece</div></SelectItem>
                               </SelectContent>
                             </Select>
                           </TableCell>
                           <TableCell>
                             <Select value={row.status} onValueChange={(v) => changeStatus(w.id, v as AttendanceStatus)}>
-                              <SelectTrigger className="h-8 w-36">
-                                <SelectValue />
-                              </SelectTrigger>
+                              <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
                               <SelectContent position="popper" className="max-h-60">
                                 {(Object.keys(STATUS_LABELS) as AttendanceStatus[]).map((s) => (
                                   <SelectItem key={s} value={s}>
@@ -533,30 +499,20 @@ function GunlukPuantajPage() {
                             </Select>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Input
-                              type="number" min={0} max={24} step={0.5}
-                              value={row.totalHours}
+                            <Input type="number" min={0} max={24} step={0.5} value={row.totalHours}
                               onChange={(e) => updateRow(w.id, { totalHours: parseFloat(e.target.value) || 0 })}
-                              className="h-8 w-20 text-center mx-auto"
-                            />
+                              className="h-8 w-20 text-center mx-auto" />
                           </TableCell>
                           <TableCell className="text-center">
-                            <Input
-                              type="number" min={0} max={12} step={0.5}
-                              value={row.overtime}
+                            <Input type="number" min={0} max={12} step={0.5} value={row.overtime}
                               onChange={(e) => updateRow(w.id, { overtime: parseFloat(e.target.value) || 0 })}
-                              className="h-8 w-20 text-center mx-auto"
-                            />
+                              className="h-8 w-20 text-center mx-auto" />
                           </TableCell>
                           <TableCell>
-                            <textarea
-                              value={row.note}
-                              onChange={(e) => updateRow(w.id, { note: e.target.value })}
+                            <textarea value={row.note} onChange={(e) => updateRow(w.id, { note: e.target.value })}
                               onInput={(e) => { const el = e.target as HTMLTextAreaElement; el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }}
-                              placeholder="Not..."
-                              rows={1}
-                              className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 w-full min-w-[120px] resize-none overflow-hidden rounded-md border bg-transparent px-3 py-1.5 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
-                            />
+                              placeholder="Not..." rows={1}
+                              className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 w-full min-w-[120px] resize-none overflow-hidden rounded-md border bg-transparent px-3 py-1.5 text-sm shadow-xs outline-none focus-visible:ring-[3px]" />
                           </TableCell>
                         </TableRow>
                       );
@@ -567,14 +523,7 @@ function GunlukPuantajPage() {
             </Table>
           </div>
         </Card>
-
-        <PuantajPagination
-          totalItems={workers.length}
-          pageSize={pageSize}
-          currentPage={currentPage}
-          onPageChange={setCurrentPage}
-          onPageSizeChange={setPageSize}
-        />
+        <PuantajPagination totalItems={workers.length} pageSize={pageSize} currentPage={currentPage} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} />
         </>
       )}
     </div>

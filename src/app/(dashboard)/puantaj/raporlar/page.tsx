@@ -1,15 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -27,10 +21,9 @@ import {
   Building2,
   Clock,
   TrendingUp,
-  FolderKanban,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import { CompanyTypeSegment, PuantajPagination } from "../components";
+import { PuantajPagination } from "../components";
 
 interface Team {
   id: string;
@@ -54,11 +47,6 @@ interface WorkerRow {
   attendances: AttendanceRecord[];
 }
 
-interface Project {
-  id: string;
-  name: string;
-}
-
 function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -69,13 +57,23 @@ function getMonthDates(year: number, month: number): { start: string; end: strin
   return { start, end };
 }
 
-export default function RaporlarPage() {
+export default function RaporlarPageWrapper() {
+  return (
+    <Suspense fallback={<div className="p-4 text-muted-foreground">Yükleniyor...</div>}>
+      <RaporlarPage />
+    </Suspense>
+  );
+}
+
+function RaporlarPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const projectId = searchParams.get("project");
+
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [workers, setWorkers] = useState<WorkerRow[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [filterProject, setFilterProject] = useState("all");
-  const [filterCompanyType, setFilterCompanyType] = useState("all");
+  const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
@@ -84,23 +82,26 @@ export default function RaporlarPage() {
   const monthName = new Date(year, month, 1).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
 
   useEffect(() => {
-    fetch("/api/projeler").then((r) => r.json()).then(setProjects);
-  }, []);
+    if (!projectId) { router.push("/puantaj"); return; }
+    fetch("/api/projeler").then((r) => r.json()).then((data) => {
+      const proj = data.find((p: { id: string; name: string }) => p.id === projectId);
+      setProjectName(proj?.name || "");
+    });
+  }, [projectId, router]);
 
   useEffect(() => {
+    if (!projectId) return;
     setLoading(true);
-    const params = new URLSearchParams({ date: start, endDate: end, shift: "all" });
-    if (filterProject !== "all") params.set("projectId", filterProject);
-    if (filterCompanyType !== "all") params.set("companyType", filterCompanyType);
+    const params = new URLSearchParams({ date: start, endDate: end, shift: "all", projectId });
 
     fetch(`/api/puantaj?${params}`)
       .then((r) => r.json())
-      .then((data: WorkerRow[]) => {
-        setWorkers(data);
+      .then((data) => {
+        setWorkers(Array.isArray(data) ? data : []);
         setCurrentPage(1);
       })
       .finally(() => setLoading(false));
-  }, [start, end, filterProject, filterCompanyType]);
+  }, [start, end, projectId]);
 
   // Firma bazlı özet
   const companySummary = useMemo(() => {
@@ -121,7 +122,7 @@ export default function RaporlarPage() {
       const s = map.get(compName)!;
       s.workers++;
       w.attendances.forEach((a) => {
-        if (a.status === "PRESENT" || a.status === "HALF_DAY") s.presentDays++;
+        if (a.status === "PRESENT" || a.status === "HALF_DAY" || a.status === "REST_DAY_WORK") s.presentDays++;
         if (a.status === "ABSENT") s.absentDays++;
         s.totalHours += a.totalHours;
         s.totalOvertime += a.overtime;
@@ -134,7 +135,7 @@ export default function RaporlarPage() {
   // Çalışan bazlı detay
   const workerSummary = useMemo(() => {
     return workers.map((w) => {
-      const presentDays = w.attendances.filter((a) => a.status === "PRESENT").length;
+      const presentDays = w.attendances.filter((a) => a.status === "PRESENT" || a.status === "REST_DAY_WORK").length;
       const halfDays = w.attendances.filter((a) => a.status === "HALF_DAY").length;
       const absentDays = w.attendances.filter((a) => a.status === "ABSENT").length;
       const totalHours = w.attendances.reduce((acc, a) => acc + a.totalHours, 0);
@@ -219,7 +220,7 @@ export default function RaporlarPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Puantaj Raporları</h1>
-          <p className="text-muted-foreground text-sm">{monthName} - Aylık devam raporu</p>
+          <p className="text-muted-foreground text-sm">{projectName} · {monthName}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => changeMonth(-1)}>←</Button>
@@ -230,23 +231,8 @@ export default function RaporlarPage() {
         </div>
       </div>
 
-      {/* Ana Yüklenici / Taşeron Segment */}
-      <CompanyTypeSegment value={filterCompanyType} onChange={setFilterCompanyType} />
-
       {/* Filtre */}
       <div className="flex items-center gap-3">
-        <Select value={filterProject} onValueChange={setFilterProject}>
-          <SelectTrigger className="w-52">
-            <FolderKanban className="h-4 w-4 mr-1.5 text-muted-foreground" />
-            <SelectValue placeholder="Proje" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tüm Projeler</SelectItem>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <div className="flex-1" />
         <Button variant="outline" size="sm" onClick={exportExcel}>
           <Download className="h-4 w-4 mr-1" /> Excel Rapor
@@ -254,11 +240,10 @@ export default function RaporlarPage() {
       </div>
 
       {/* Genel Özet Kartları */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard icon={<Users className="h-4 w-4" />} label="Çalışan" value={totals.workers} />
         <SummaryCard icon={<Clock className="h-4 w-4 text-green-600" />} label="Gelen (gün)" value={totals.presentDays} color="text-green-600" />
         <SummaryCard icon={<Clock className="h-4 w-4 text-red-600" />} label="Gelmeyen (gün)" value={totals.absentDays} color="text-red-600" />
-        <SummaryCard icon={<Clock className="h-4 w-4" />} label="Toplam Saat" value={totals.totalHours.toLocaleString("tr-TR")} />
         <SummaryCard icon={<TrendingUp className="h-4 w-4 text-orange-600" />} label="Mesai Saat" value={totals.totalOvertime} color="text-orange-600" />
       </div>
 
@@ -284,7 +269,6 @@ export default function RaporlarPage() {
                       <TableHead className="text-center">Çalışan</TableHead>
                       <TableHead className="text-center">Gelen (gün)</TableHead>
                       <TableHead className="text-center">Gelmeyen (gün)</TableHead>
-                      <TableHead className="text-center">Toplam Saat</TableHead>
                       <TableHead className="text-center">Mesai Saat</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -295,7 +279,6 @@ export default function RaporlarPage() {
                         <TableCell className="text-center">{c.workers}</TableCell>
                         <TableCell className="text-center text-green-600">{c.presentDays}</TableCell>
                         <TableCell className="text-center text-red-600">{c.absentDays}</TableCell>
-                        <TableCell className="text-center">{c.totalHours.toLocaleString("tr-TR")}</TableCell>
                         <TableCell className="text-center text-orange-600">{c.totalOvertime}</TableCell>
                       </TableRow>
                     ))}
@@ -305,7 +288,6 @@ export default function RaporlarPage() {
                       <TableCell className="text-center">{totals.workers}</TableCell>
                       <TableCell className="text-center text-green-600">{totals.presentDays}</TableCell>
                       <TableCell className="text-center text-red-600">{totals.absentDays}</TableCell>
-                      <TableCell className="text-center">{totals.totalHours.toLocaleString("tr-TR")}</TableCell>
                       <TableCell className="text-center text-orange-600">{totals.totalOvertime}</TableCell>
 
                     </TableRow>
@@ -334,7 +316,6 @@ export default function RaporlarPage() {
                       <TableHead>Ekip</TableHead>
                       <TableHead className="text-center">Geldi</TableHead>
                       <TableHead className="text-center">Gelmedi</TableHead>
-                      <TableHead className="text-center">Saat</TableHead>
                       <TableHead className="text-center">Mesai</TableHead>
 
                     </TableRow>
@@ -353,7 +334,6 @@ export default function RaporlarPage() {
                           {w.presentDays}{w.halfDays > 0 ? `+${w.halfDays}Y` : ""}
                         </TableCell>
                         <TableCell className="text-center text-red-600">{w.absentDays || "-"}</TableCell>
-                        <TableCell className="text-center">{w.totalHours}</TableCell>
                         <TableCell className="text-center text-orange-600">{w.totalOvertime || "-"}</TableCell>
 
                       </TableRow>

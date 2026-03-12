@@ -9,6 +9,7 @@ export async function GET(
   const { id: projectId } = await params;
 
   try {
+    // 1) ProjectWorkerAssignment ile atanmış çalışanlar
     const assignments = await prisma.projectWorkerAssignment.findMany({
       where: { projectId, isActive: true },
       include: {
@@ -26,11 +27,47 @@ export async function GET(
       orderBy: { assignedAt: "desc" },
     });
 
-    const result = assignments.map((a) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const assignmentResult = assignments.map((a: any) => ({
       assignmentId: a.id,
       assignedAt: a.assignedAt,
       ...a.worker,
     }));
+
+    // 2) Team.projectId üzerinden ilişkili ama henüz ProjectWorkerAssignment'ta olmayan çalışanlar
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const assignedWorkerIds = new Set(assignments.map((a: any) => a.workerId));
+    const teamWorkers = await prisma.worker.findMany({
+      where: {
+        isActive: true,
+        team: { projectId },
+        id: { notIn: Array.from(assignedWorkerIds).length > 0 ? Array.from(assignedWorkerIds) : ["_none_"] },
+      },
+      include: {
+        team: {
+          include: {
+            company: { select: { id: true, name: true, type: true, sortOrder: true } },
+            discipline: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [
+        { team: { company: { sortOrder: "asc" } } },
+        { team: { sortOrder: "asc" } },
+        { sortOrder: "asc" },
+        { lastName: "asc" },
+      ],
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const teamResult = teamWorkers.map((w: any) => ({
+      assignmentId: null,
+      assignedAt: null,
+      ...w,
+    }));
+
+    // Her iki kaynağı birleştir
+    const result = [...assignmentResult, ...teamResult];
 
     return NextResponse.json(result);
   } catch (error) {

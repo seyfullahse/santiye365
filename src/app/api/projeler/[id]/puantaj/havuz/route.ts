@@ -8,20 +8,32 @@ export async function GET(
 ) {
   const { id: projectId } = await params;
   const search = req.nextUrl.searchParams.get("search") || "";
+  const companyType = req.nextUrl.searchParams.get("companyType") || "";
 
   try {
-    // Zaten atanmış olanları bul
+    // Zaten atanmış olanları bul (ProjectWorkerAssignment)
     const assigned = await prisma.projectWorkerAssignment.findMany({
       where: { projectId, isActive: true },
       select: { workerId: true },
     });
-    const assignedIds = assigned.map((a) => a.workerId);
+    const assignedIds = assigned.map((a: { workerId: string }) => a.workerId);
+
+    // Team.projectId üzerinden zaten projede olan çalışanları bul
+    const teamWorkers = await prisma.worker.findMany({
+      where: { isActive: true, team: { projectId } },
+      select: { id: true },
+    });
+    const teamWorkerIds = teamWorkers.map((w: { id: string }) => w.id);
+
+    // Her iki kaynaktan gelen ID'leri birleştir
+    const excludeIds = [...new Set([...assignedIds, ...teamWorkerIds])];
 
     // Atanmamış aktif çalışanları getir
     const workers = await prisma.worker.findMany({
       where: {
         isActive: true,
-        id: { notIn: assignedIds.length > 0 ? assignedIds : ["_none_"] },
+        id: { notIn: excludeIds.length > 0 ? excludeIds : ["_none_"] },
+        ...(companyType ? { team: { company: { type: companyType as "MAIN" | "SUBCONTRACTOR" | "MANAGEMENT" } } } : {}),
         ...(search
           ? {
               OR: [

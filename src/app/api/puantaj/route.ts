@@ -24,14 +24,36 @@ export async function GET(req: NextRequest) {
       ? new Date(endDate + "T00:00:00.000Z")
       : parsedStart;
 
+    // Proje bazlı filtreleme: ProjectWorkerAssignment + Team.projectId üzerinden
+    let assignedWorkerIds: string[] | null = null;
+    if (projectId) {
+      // 1) ProjectWorkerAssignment ile atanmış çalışanlar
+      const assignments = await prisma.projectWorkerAssignment.findMany({
+        where: { projectId, isActive: true },
+        select: { workerId: true },
+      });
+      const assignmentIds = assignments.map((a) => a.workerId);
+
+      // 2) Team.projectId üzerinden ilişkili çalışanlar
+      const teamWorkers = await prisma.worker.findMany({
+        where: { isActive: true, team: { projectId } },
+        select: { id: true },
+      });
+      const teamWorkerIds = teamWorkers.map((w) => w.id);
+
+      // İki kaynağı birleştir (union)
+      const idSet = new Set([...assignmentIds, ...teamWorkerIds]);
+      assignedWorkerIds = Array.from(idSet);
+    }
+
     // Çalışanları getir (filtrelere göre)
     const workers = await prisma.worker.findMany({
       where: {
         isActive: true,
+        ...(assignedWorkerIds !== null ? { id: { in: assignedWorkerIds } } : {}),
         ...(teamId ? { teamId } : {}),
         ...(companyId ? { team: { companyId } } : {}),
         ...(companyType && companyType !== "all" ? { team: { company: { type: companyType as "MAIN" | "SUBCONTRACTOR" | "MANAGEMENT" } } } : {}),
-        ...(projectId ? { team: { projectId } } : {}),
       },
       include: {
         team: {
@@ -94,7 +116,7 @@ export async function POST(req: NextRequest) {
       records: {
         workerId: string;
         shift?: "DAY" | "NIGHT";
-        status: "PRESENT" | "HALF_DAY" | "ABSENT" | "PAID_LEAVE" | "UNPAID_LEAVE" | "ANNUAL_LEAVE" | "SICK_LEAVE" | "DAY_OFF";
+        status: "PRESENT" | "HALF_DAY" | "ABSENT" | "PAID_LEAVE" | "UNPAID_LEAVE" | "ANNUAL_LEAVE" | "SICK_LEAVE" | "DAY_OFF" | "REST_DAY_WORK";
         totalHours: number;
         overtime: number;
         note?: string;
