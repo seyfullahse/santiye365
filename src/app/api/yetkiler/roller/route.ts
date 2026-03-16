@@ -60,7 +60,7 @@ export async function PUT(req: NextRequest) {
       // Audit log
       await logPermissionChange(
         session.user.id,
-        undefined,
+        "ROLE:" + role,
         `${role} rolü izinleri güncellendi (${toCreate.length} izin)`,
         {
           role,
