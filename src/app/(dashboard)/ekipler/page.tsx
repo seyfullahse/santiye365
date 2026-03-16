@@ -72,7 +72,7 @@ export default function EkiplerPage() {
 
   const fetchTeams = async () => {
     try {
-      const res = await fetch("/api/ekipler");
+      const res = await fetch("/api/ekipler?companyType=SUBCONTRACTOR");
       if (!res.ok) throw new Error("Ekipler yüklenemedi");
       const data = await res.json();
       setTeams(data);

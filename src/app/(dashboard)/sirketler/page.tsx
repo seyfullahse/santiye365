@@ -175,9 +175,12 @@ export default function SirketlerPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
-          <h1 className="text-xl sm:text-2xl font-bold">Şirketler</h1>
+        <div>
+          <div className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
+            <h1 className="text-xl sm:text-2xl font-bold">Taşeron Şirketler</h1>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">Ana firma bilgileri Organizasyon &gt; Profil sayfasından yönetilir</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
@@ -213,7 +216,6 @@ export default function SirketlerPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="SUBCONTRACTOR">Taşeron</SelectItem>
-                    <SelectItem value="MAIN">Ana Yüklenici</SelectItem>
                     <SelectItem value="MANAGEMENT">Yönetim</SelectItem>
                   </SelectContent>
                 </Select>

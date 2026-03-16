@@ -100,33 +100,62 @@ export async function GET(req: NextRequest) {
     };
 
     // Ana Firma / Taşeron ayrımı için ek istatistikler
-    const mainWorkers = await prisma.worker.findMany({
+    type CollarWorker = { id: string; collarType: string | null };
+    const mainWorkers: CollarWorker[] = await prisma.worker.findMany({
       where: { isActive: true, team: { company: { type: "MAIN" } } },
-      select: { id: true },
-    });
-    const mainWorkerIds = mainWorkers.map((w: { id: string }) => w.id);
+      select: { id: true, collarType: true },
+    }) as CollarWorker[];
+    const mainWorkerIds = mainWorkers.map((w) => w.id);
+    const mainWhite = mainWorkers.filter((w) => w.collarType === "WHITE").length;
+    const mainBlue = mainWorkers.filter((w) => w.collarType !== "WHITE").length;
 
-    const subWorkers = await prisma.worker.findMany({
+    const subWorkers: CollarWorker[] = await prisma.worker.findMany({
       where: { isActive: true, team: { company: { type: "SUBCONTRACTOR" } } },
-      select: { id: true },
-    });
-    const subWorkerIds = subWorkers.map((w: { id: string }) => w.id);
+      select: { id: true, collarType: true },
+    }) as CollarWorker[];
+    const subWorkerIds = subWorkers.map((w) => w.id);
+    const subWhite = subWorkers.filter((w) => w.collarType === "WHITE").length;
+    const subBlue = subWorkers.filter((w) => w.collarType !== "WHITE").length;
+
+    // Collar type map
+    const mainCollarMap = new Map<string, string>();
+    for (const w of mainWorkers) mainCollarMap.set(w.id, w.collarType ?? "BLUE");
+    const subCollarMap = new Map<string, string>();
+    for (const w of subWorkers) subCollarMap.set(w.id, w.collarType ?? "BLUE");
 
     // Bugünkü yoklama - ana firma
     let mainPresent = 0;
     let mainAbsent = 0;
+    let mainLeave = 0;
+    let mainWhitePresent = 0;
+    let mainBluePresent = 0;
+    const LEAVE_STATUSES = ["PAID_LEAVE", "UNPAID_LEAVE", "ANNUAL_LEAVE", "SICK_LEAVE", "ADMINISTRATIVE_LEAVE", "DAY_OFF"];
     for (const id of mainWorkerIds) {
       const s = todayAttMap.get(id);
-      if (s === "PRESENT" || s === "HALF_DAY" || s === "REST_DAY_WORK") mainPresent++;
+      if (s === "PRESENT" || s === "HALF_DAY" || s === "REST_DAY_WORK") {
+        mainPresent++;
+        if (mainCollarMap.get(id) === "WHITE") mainWhitePresent++;
+        else mainBluePresent++;
+      }
+      else if (s && LEAVE_STATUSES.includes(s)) mainLeave++;
       else if (s === "ABSENT") mainAbsent++;
-      else if (!s) mainAbsent++; // Kaydı olmayan = gelmedi
+      else if (!s) mainAbsent++;
     }
 
     // Bugünkü yoklama - taşeron
     let subPresent = 0;
+    let subAbsent = 0;
+    let subWhitePresent = 0;
+    let subBluePresent = 0;
     for (const id of subWorkerIds) {
       const s = todayAttMap.get(id);
-      if (s === "PRESENT" || s === "HALF_DAY" || s === "REST_DAY_WORK") subPresent++;
+      if (s === "PRESENT" || s === "HALF_DAY" || s === "REST_DAY_WORK") {
+        subPresent++;
+        if (subCollarMap.get(id) === "WHITE") subWhitePresent++;
+        else subBluePresent++;
+      }
+      else if (s === "ABSENT") subAbsent++;
+      else if (!s) subAbsent++;
     }
 
     // Aylık saat - ana firma
@@ -152,8 +181,13 @@ export async function GET(req: NextRequest) {
 
     const mainStats = {
       totalWorkers: mainWorkerIds.length,
+      white: mainWhite,
+      blue: mainBlue,
+      whitePresent: mainWhitePresent,
+      bluePresent: mainBluePresent,
       todayPresent: mainPresent,
       todayAbsent: mainAbsent,
+      todayLeave: mainLeave,
       monthTotalHours: mainMonthAgg._sum.totalHours ?? 0,
       monthOvertime: mainMonthAgg._sum.overtime ?? 0,
       totalCompanies: mainCompanies.length,
@@ -162,7 +196,12 @@ export async function GET(req: NextRequest) {
 
     const subStats = {
       totalWorkers: subWorkerIds.length,
+      white: subWhite,
+      blue: subBlue,
+      whitePresent: subWhitePresent,
+      bluePresent: subBluePresent,
       todayPresent: subPresent,
+      todayAbsent: subAbsent,
       monthTotalHours: subMonthAgg._sum.totalHours ?? 0,
       monthOvertime: subMonthAgg._sum.overtime ?? 0,
       totalCompanies: subCompanyCount,
@@ -226,10 +265,34 @@ export async function GET(req: NextRequest) {
       companies: Set<string>;
       todayPresent: number;
       todayAbsent: number;
+      mainPresent: number;
+      subPresent: number;
       monthHours: number;
       monthOvertime: number;
     };
     const projectMap = new Map<string, ProjectEntry>();
+
+    // 0) Tüm aktif projeleri çek (boş proje kartları da görünsün)
+    const allProjects = await prisma.project.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    const mainWorkerIdSet = new Set(mainWorkerIds);
+    for (const proj of allProjects) {
+      projectMap.set(proj.id, {
+        projectId: proj.id,
+        projectName: proj.name,
+        workers: new Set(),
+        companies: new Set(),
+        todayPresent: 0,
+        todayAbsent: 0,
+        mainPresent: 0,
+        subPresent: 0,
+        monthHours: 0,
+        monthOvertime: 0,
+      });
+    }
 
     // 1) Team.projectId üzerinden
     for (const team of teams) {
@@ -244,6 +307,8 @@ export async function GET(req: NextRequest) {
           companies: new Set(),
           todayPresent: 0,
           todayAbsent: 0,
+          mainPresent: 0,
+          subPresent: 0,
           monthHours: 0,
           monthOvertime: 0,
         });
@@ -256,7 +321,11 @@ export async function GET(req: NextRequest) {
         if (ps.workers.has(w.id)) continue; // Zaten eklenmişse atla
         ps.workers.add(w.id);
         const status = todayAttMap.get(w.id);
-        if (status === "PRESENT" || status === "HALF_DAY" || status === "REST_DAY_WORK") ps.todayPresent++;
+        if (status === "PRESENT" || status === "HALF_DAY" || status === "REST_DAY_WORK") {
+          ps.todayPresent++;
+          if (mainWorkerIdSet.has(w.id)) ps.mainPresent++;
+          else ps.subPresent++;
+        }
         else if (status === "ABSENT") ps.todayAbsent++;
 
         const mh = monthHoursMap.get(w.id);
@@ -281,6 +350,8 @@ export async function GET(req: NextRequest) {
           companies: new Set(),
           todayPresent: 0,
           todayAbsent: 0,
+          mainPresent: 0,
+          subPresent: 0,
           monthHours: 0,
           monthOvertime: 0,
         });
@@ -292,7 +363,11 @@ export async function GET(req: NextRequest) {
       if (ps.workers.has(assignment.worker.id)) continue; // Zaten eklenmişse atla
       ps.workers.add(assignment.worker.id);
       const status = todayAttMap.get(assignment.worker.id);
-      if (status === "PRESENT" || status === "HALF_DAY" || status === "REST_DAY_WORK") ps.todayPresent++;
+      if (status === "PRESENT" || status === "HALF_DAY" || status === "REST_DAY_WORK") {
+        ps.todayPresent++;
+        if (mainWorkerIdSet.has(assignment.worker.id)) ps.mainPresent++;
+        else ps.subPresent++;
+      }
       else if (status === "ABSENT") ps.todayAbsent++;
 
       const mh = monthHoursMap.get(assignment.worker.id);
@@ -308,6 +383,8 @@ export async function GET(req: NextRequest) {
       workerCount: ps.workers.size,
       todayPresent: ps.todayPresent,
       todayAbsent: ps.todayAbsent,
+      mainPresent: ps.mainPresent,
+      subPresent: ps.subPresent,
       monthHours: Math.round(ps.monthHours * 10) / 10,
       monthOvertime: Math.round(ps.monthOvertime * 10) / 10,
       companyCount: ps.companies.size,

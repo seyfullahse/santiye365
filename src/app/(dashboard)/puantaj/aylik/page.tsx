@@ -55,6 +55,7 @@ interface WorkerRow {
   firstName: string;
   lastName: string;
   role: string;
+  collarType: string;
   team: Team;
   attendances: AttendanceRecord[];
 }
@@ -79,7 +80,10 @@ const STATUS_SHORT_COLORS: Record<AttendanceStatus, string> = {
 };
 
 function formatDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function getMonthDates(year: number, month: number): string[] {
@@ -126,6 +130,8 @@ function AylikPuantajPage() {
   const [loading, setLoading] = useState(true);
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<"daily" | "monthly">("monthly");
+  const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()));
 
   useEffect(() => {
     if (!projectId) router.push("/puantaj");
@@ -199,25 +205,66 @@ function AylikPuantajPage() {
     return Array.from(groups.values());
   }, [workers, currentPage, pageSize]);
 
-  // Toplam istatistikler
+  // Toplam istatistikler (Ana Firma / Alt Yüklenici / Toplam)
   const totals = useMemo(() => {
-    let totalHours = 0, totalOvertime = 0, totalPresent = 0, totalAbsent = 0;
-    workers.forEach((w) => {
-      w.attendances.forEach((a) => {
-        totalHours += a.totalHours;
-        totalOvertime += a.overtime;
-        if (a.status === "PRESENT" || a.status === "HALF_DAY") totalPresent++;
-        if (a.status === "ABSENT") totalAbsent++;
+    const calc = (list: WorkerRow[]) => {
+      let totalHours = 0, totalOvertime = 0, totalPresent = 0, totalAbsent = 0, whiteCount = 0, blueCount = 0;
+      list.forEach((w) => {
+        if (w.collarType === "WHITE") whiteCount++; else blueCount++;
+        w.attendances.forEach((a) => {
+          totalHours += a.totalHours;
+          totalOvertime += a.overtime;
+          if (a.status === "PRESENT" || a.status === "HALF_DAY" || a.status === "REST_DAY_WORK") totalPresent++;
+          if (a.status === "ABSENT") totalAbsent++;
+        });
       });
-    });
-    return { totalHours, totalOvertime, totalPresent, totalAbsent };
+      return { count: list.length, totalHours, totalOvertime, totalPresent, totalAbsent, whiteCount, blueCount };
+    };
+    const mainWorkers = workers.filter((w) => w.team.company.type === "MAIN");
+    const subWorkers = workers.filter((w) => w.team.company.type === "SUBCONTRACTOR");
+    const mainCompanyName = mainWorkers.length > 0 ? mainWorkers[0].team.company.name : "Ana Firma";
+    return {
+      main: { ...calc(mainWorkers), name: mainCompanyName },
+      sub: calc(subWorkers),
+      all: calc(workers),
+    };
   }, [workers]);
+
+  // Günlük istatistikler
+  const dailyTotals = useMemo(() => {
+    const calc = (list: WorkerRow[]) => {
+      let totalHours = 0, totalOvertime = 0, totalPresent = 0, totalAbsent = 0, whiteCount = 0, blueCount = 0, whitePresent = 0, bluePresent = 0;
+      list.forEach((w) => {
+        const isWhite = w.collarType === "WHITE";
+        if (isWhite) whiteCount++; else blueCount++;
+        const att = w.attendances.find((a) => a.date === selectedDate);
+        if (att) {
+          totalHours += att.totalHours;
+          totalOvertime += att.overtime;
+          if (att.status === "PRESENT" || att.status === "HALF_DAY" || att.status === "REST_DAY_WORK") {
+            totalPresent++;
+            if (isWhite) whitePresent++; else bluePresent++;
+          }
+          if (att.status === "ABSENT") totalAbsent++;
+        }
+      });
+      return { count: list.length, totalHours, totalOvertime, totalPresent, totalAbsent, whiteCount, blueCount, whitePresent, bluePresent };
+    };
+    const mainWorkers = workers.filter((w) => w.team.company.type === "MAIN");
+    const subWorkers = workers.filter((w) => w.team.company.type === "SUBCONTRACTOR");
+    const mainCompanyName = mainWorkers.length > 0 ? mainWorkers[0].team.company.name : "Ana Firma";
+    return {
+      main: { ...calc(mainWorkers), name: mainCompanyName },
+      sub: calc(subWorkers),
+      all: calc(workers),
+    };
+  }, [workers, selectedDate]);
 
   const fileRef = useRef<HTMLInputElement>(null);
 
   const exportExcel = () => {
     // Header satırı: #, Firma, Ekip, Ad Soyad, Görevi, 1, 2, ..., 31, Gün, Toplam Saat, Mesai
-    const header: (string | number)[] = ["#", "Firma", "Ekip", "Ad Soyad", "Görevi"];
+    const header: (string | number)[] = ["#", "Firma", "Ekip", "Ad Soyad", "Görevi", "Yaka"];
     dates.forEach((dd) => header.push(new Date(dd + "T00:00:00").getDate()));
     header.push("Gün", "Toplam Saat", "Mesai");
 
@@ -230,6 +277,7 @@ function AylikPuantajPage() {
         w.team.name,
         `${w.firstName} ${w.lastName}`,
         w.role,
+        w.collarType === "WHITE" ? "Beyaz" : "Mavi",
       ];
       const attMap = new Map(w.attendances.map((a) => [a.date, a]));
       let totalH = 0, totalO = 0, presentDays = 0;
@@ -252,6 +300,7 @@ function AylikPuantajPage() {
       { wch: 14 },  // Ekip
       { wch: 22 },  // Ad Soyad
       { wch: 14 },  // Görevi
+      { wch: 8 },   // Yaka
     ];
     dates.forEach(() => cols.push({ wch: 4 }));
     cols.push({ wch: 5 }, { wch: 10 }, { wch: 7 });
@@ -402,24 +451,117 @@ function AylikPuantajPage() {
         </div>
       </div>
 
-      {/* Özet */}
-      <div className="flex flex-wrap gap-4 text-sm">
-        <Badge variant="secondary" className="text-sm py-1 px-3">
-          <Users className="h-3.5 w-3.5 mr-1" /> {workers.length} Çalışan
-        </Badge>
-        <Badge variant="secondary" className="text-sm py-1 px-3 text-green-700">
-          {totals.totalPresent} geldi
-        </Badge>
-        <Badge variant="secondary" className="text-sm py-1 px-3 text-red-700">
-          {totals.totalAbsent} gelmedi
-        </Badge>
-        <Badge variant="secondary" className="text-sm py-1 px-3">
-          Toplam: {totals.totalHours.toLocaleString("tr-TR")} saat
-        </Badge>
-        <Badge variant="secondary" className="text-sm py-1 px-3 text-orange-700">
-          Mesai: {totals.totalOvertime} saat
-        </Badge>
+      {/* Günlük / Aylık seçici */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
+          {(["daily", "monthly"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setViewMode(v)}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                viewMode === v ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {v === "daily" ? "Günlük" : "Aylık"}
+            </button>
+          ))}
+        </div>
+        {viewMode === "daily" && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => {
+              const d = new Date(selectedDate + "T00:00:00");
+              d.setDate(d.getDate() - 1);
+              setSelectedDate(formatDate(d));
+            }}>
+              <ChevronLeft className="h-3 w-3" />
+            </Button>
+            <span className="text-sm font-medium min-w-[140px] text-center">
+              {new Date(selectedDate + "T00:00:00").toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" })}
+            </span>
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => {
+              const d = new Date(selectedDate + "T00:00:00");
+              d.setDate(d.getDate() + 1);
+              setSelectedDate(formatDate(d));
+            }}>
+              <ChevronRight className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Özet */}
+      {viewMode === "monthly" ? (
+      <div className="space-y-2">
+        {/* Ana Firma */}
+        {totals.main.count > 0 && (
+          <div className="flex flex-wrap items-center gap-3 text-sm rounded-lg border border-blue-200 bg-blue-50/30 dark:bg-blue-950/20 px-3 py-2">
+            <span className="font-semibold text-blue-700 min-w-[100px]">{totals.main.name}</span>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2">{totals.main.count} Çalışan</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-sky-600">{totals.main.whiteCount} B.Yaka</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-indigo-600">{totals.main.blueCount} M.Yaka</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-green-700">{totals.main.totalPresent} geldi</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2">{totals.main.totalHours.toLocaleString("tr-TR")} saat</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-orange-700">{totals.main.totalOvertime} mesai</Badge>
+          </div>
+        )}
+        {/* Alt Yüklenici */}
+        {totals.sub.count > 0 && (
+          <div className="flex flex-wrap items-center gap-3 text-sm rounded-lg border border-orange-200 bg-orange-50/30 dark:bg-orange-950/20 px-3 py-2">
+            <span className="font-semibold text-orange-700 min-w-[100px]">Alt Yüklenici</span>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2">{totals.sub.count} Çalışan</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-sky-600">{totals.sub.whiteCount} B.Yaka</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-indigo-600">{totals.sub.blueCount} M.Yaka</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-green-700">{totals.sub.totalPresent} geldi</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2">{totals.sub.totalHours.toLocaleString("tr-TR")} saat</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-orange-700">{totals.sub.totalOvertime} mesai</Badge>
+          </div>
+        )}
+        {/* Toplam */}
+        <div className="flex flex-wrap items-center gap-3 text-sm rounded-lg border px-3 py-2">
+          <span className="font-semibold min-w-[100px]">Toplam</span>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2"><Users className="h-3 w-3 mr-1" />{totals.all.count} Çalışan</Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2 text-sky-600">{totals.all.whiteCount} B.Yaka</Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2 text-indigo-600">{totals.all.blueCount} M.Yaka</Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2 text-green-700">{totals.all.totalPresent} geldi</Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2">{totals.all.totalHours.toLocaleString("tr-TR")} saat</Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2 text-orange-700">{totals.all.totalOvertime} mesai</Badge>
+        </div>
+      </div>
+      ) : (
+      <div className="space-y-2">
+        {/* Ana Firma - Günlük */}
+        {dailyTotals.main.count > 0 && (
+          <div className="flex flex-wrap items-center gap-3 text-sm rounded-lg border border-blue-200 bg-blue-50/30 dark:bg-blue-950/20 px-3 py-2">
+            <span className="font-semibold text-blue-700 min-w-[100px]">{dailyTotals.main.name}</span>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-sky-600">{dailyTotals.main.whiteCount} B.Yaka <span className="text-green-600 ml-1">{dailyTotals.main.whitePresent} geldi</span></Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-indigo-600">{dailyTotals.main.blueCount} M.Yaka <span className="text-green-600 ml-1">{dailyTotals.main.bluePresent} geldi</span></Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2">{dailyTotals.main.count} Toplam <span className="text-green-600 ml-1">{dailyTotals.main.totalPresent} geldi</span></Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2">{dailyTotals.main.totalHours} saat</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-orange-700">{dailyTotals.main.totalOvertime} mesai</Badge>
+          </div>
+        )}
+        {/* Alt Yüklenici - Günlük */}
+        {dailyTotals.sub.count > 0 && (
+          <div className="flex flex-wrap items-center gap-3 text-sm rounded-lg border border-orange-200 bg-orange-50/30 dark:bg-orange-950/20 px-3 py-2">
+            <span className="font-semibold text-orange-700 min-w-[100px]">Alt Yüklenici</span>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-sky-600">{dailyTotals.sub.whiteCount} B.Yaka <span className="text-green-600 ml-1">{dailyTotals.sub.whitePresent} geldi</span></Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-indigo-600">{dailyTotals.sub.blueCount} M.Yaka <span className="text-green-600 ml-1">{dailyTotals.sub.bluePresent} geldi</span></Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2">{dailyTotals.sub.count} Toplam <span className="text-green-600 ml-1">{dailyTotals.sub.totalPresent} geldi</span></Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2">{dailyTotals.sub.totalHours} saat</Badge>
+            <Badge variant="secondary" className="text-xs py-0.5 px-2 text-orange-700">{dailyTotals.sub.totalOvertime} mesai</Badge>
+          </div>
+        )}
+        {/* Toplam - Günlük */}
+        <div className="flex flex-wrap items-center gap-3 text-sm rounded-lg border px-3 py-2">
+          <span className="font-semibold min-w-[100px]">Toplam</span>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2 text-sky-600"><Users className="h-3 w-3 mr-1" />{dailyTotals.all.whiteCount} B.Yaka <span className="text-green-600 ml-1">{dailyTotals.all.whitePresent} geldi</span></Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2 text-indigo-600">{dailyTotals.all.blueCount} M.Yaka <span className="text-green-600 ml-1">{dailyTotals.all.bluePresent} geldi</span></Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2">{dailyTotals.all.count} Toplam <span className="text-green-600 ml-1">{dailyTotals.all.totalPresent} geldi</span></Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2">{dailyTotals.all.totalHours} saat</Badge>
+          <Badge variant="secondary" className="text-xs py-0.5 px-2 text-orange-700">{dailyTotals.all.totalOvertime} mesai</Badge>
+        </div>
+      </div>
+      )}
 
       {/* Filtreler */}
       <div className="flex flex-wrap items-center gap-3">
@@ -485,6 +627,7 @@ function AylikPuantajPage() {
                   <TableHead className="w-28 sticky left-10 bg-background z-10">Firma</TableHead>
                   <TableHead className="min-w-[150px] sticky left-[152px] bg-background z-10">Ad Soyad</TableHead>
                   <TableHead className="w-20 sticky left-[302px] bg-background z-10">Görevi</TableHead>
+                  <TableHead className="w-16 sticky left-[382px] bg-background z-10">Yaka</TableHead>
                   {dates.map((dd) => {
                     const dayNum = new Date(dd + "T00:00:00").getDate();
                     const weekend = isWeekend(dd);
@@ -504,7 +647,7 @@ function AylikPuantajPage() {
                 {paginatedGroupedWorkers.map((group) => (
                   <Fragment key={`grp-${group.company}`}>
                     <TableRow className="bg-muted/40">
-                      <TableCell colSpan={4 + dates.length + 3} className="py-1 sticky left-0">
+                      <TableCell colSpan={5 + dates.length + 3} className="py-1 sticky left-0">
                         <span className="font-semibold text-xs">{group.company}</span>
                         <Badge variant="secondary" className="ml-2 text-[10px]">{group.workers.length}</Badge>
                       </TableCell>
@@ -520,6 +663,9 @@ function AylikPuantajPage() {
                             {w.firstName} {w.lastName}
                           </TableCell>
                           <TableCell className="text-[10px] text-muted-foreground sticky left-[302px] bg-background">{w.role}</TableCell>
+                          <TableCell className={`text-[10px] font-medium sticky left-[382px] bg-background ${w.collarType === "WHITE" ? "text-sky-600" : "text-indigo-600"}`}>
+                            {w.collarType === "WHITE" ? "Beyaz" : "Mavi"}
+                          </TableCell>
                           {dates.map((dd) => {
                             const att = attMap.get(dd);
                             if (att) {

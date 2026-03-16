@@ -83,6 +83,7 @@ export async function GET(req: NextRequest) {
       firstName: w.firstName,
       lastName: w.lastName,
       role: w.role,
+      collarType: (w as unknown as { collarType: string | null }).collarType ?? "BLUE",
       sortOrder: w.sortOrder,
       team: w.team,
       attendances: w.attendances.map((att) => ({
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
       records: {
         workerId: string;
         shift?: "DAY" | "NIGHT";
-        status: "PRESENT" | "HALF_DAY" | "ABSENT" | "PAID_LEAVE" | "UNPAID_LEAVE" | "ANNUAL_LEAVE" | "SICK_LEAVE" | "DAY_OFF" | "REST_DAY_WORK";
+        status: "PRESENT" | "HALF_DAY" | "ABSENT" | "PAID_LEAVE" | "UNPAID_LEAVE" | "ANNUAL_LEAVE" | "SICK_LEAVE" | "ADMINISTRATIVE_LEAVE" | "DAY_OFF" | "REST_DAY_WORK";
         totalHours: number;
         overtime: number;
         note?: string;

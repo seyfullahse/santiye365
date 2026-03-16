@@ -113,32 +113,43 @@ export async function PUT(
     updateData.password = await bcrypt.hash(password, 10);
   }
 
-  const user = await (prisma.user as any).update({
-    where: { id },
-    data: updateData,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true,
-      phone: true,
-      employeeId: true,
-      lastLoginAt: true,
-      createdAt: true,
-      employee: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          department: { select: { name: true } },
-          position: { select: { name: true } },
+  console.log("[PUT /api/kullanicilar] updateData:", JSON.stringify(updateData));
+  console.log("[PUT /api/kullanicilar] role value:", role, "type:", typeof role);
+
+  try {
+    const user = await (prisma.user as any).update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        phone: true,
+        employeeId: true,
+        lastLoginAt: true,
+        createdAt: true,
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            department: { select: { name: true } },
+            position: { select: { name: true } },
+          },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json(user);
+    return NextResponse.json(user);
+  } catch (err: any) {
+    console.error("Kullanıcı güncelleme hatası:", err);
+    return NextResponse.json(
+      { error: err?.message || "Kullanıcı güncellenemedi" },
+      { status: 500 }
+    );
+  }
 }
 
 // DELETE — Kullanıcı sil (SUPER_ADMIN veya ADMIN, kendini silemez)

@@ -104,35 +104,43 @@ export async function POST(req: NextRequest) {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const user = await (prisma.user as any).create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-      role: role || "USER",
-      phone: phone || null,
-      employeeId: employeeId || null,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true,
-      phone: true,
-      employeeId: true,
-      createdAt: true,
-      employee: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          department: { select: { name: true } },
-          position: { select: { name: true } },
+  try {
+    const user = await (prisma.user as any).create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: role || "USER",
+        phone: phone || null,
+        employeeId: employeeId || null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        phone: true,
+        employeeId: true,
+        createdAt: true,
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            department: { select: { name: true } },
+            position: { select: { name: true } },
+          },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json(user, { status: 201 });
+    return NextResponse.json(user, { status: 201 });
+  } catch (err: any) {
+    console.error("Kullanıcı oluşturma hatası:", err);
+    return NextResponse.json(
+      { error: err?.message || "Kullanıcı oluşturulamadı" },
+      { status: 500 }
+    );
+  }
 }

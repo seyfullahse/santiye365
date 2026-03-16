@@ -4,22 +4,43 @@ import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Users,
   UserCheck,
   UserX,
   Clock,
-  Building2,
   FolderKanban,
   CalendarDays,
   TrendingUp,
-  ArrowRight,
   HardHat,
   CalendarRange,
   BarChart3,
+  ChevronDown,
+  ChevronUp,
+  Building2,
 } from "lucide-react";
 import Link from "next/link";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 interface ProjectStat {
   projectId: string | null;
@@ -27,43 +48,104 @@ interface ProjectStat {
   workerCount: number;
   todayPresent: number;
   todayAbsent: number;
+  mainPresent: number;
+  subPresent: number;
   monthHours: number;
   monthOvertime: number;
   companyCount: number;
 }
 
-interface DashboardStats {
-  totalWorkers: number;
-  activeWorkers: number;
-  todayPresent: number;
-  todayAbsent: number;
-  todayHalfDay: number;
-  monthTotalHours: number;
-  monthOvertime: number;
-  totalCompanies: number;
-  totalTeams: number;
+// İstatistik tipleri
+interface DayStat {
+  date: string;
+  present: number;
+  absent: number;
+  leave: number;
+  total: number;
+  hours: number;
+  overtime: number;
 }
 
-interface CompanyTypeStats {
+interface CompanyTotals {
   totalWorkers: number;
-  todayPresent: number;
-  todayAbsent?: number;
-  monthTotalHours: number;
-  monthOvertime: number;
-  totalCompanies: number;
-  companyName?: string;
+  white: number;
+  blue: number;
+  present: number;
+  absent: number;
+  adminLeave: number;
+  dayOff: number;
+  restDayWork: number;
+  otherLeave: number;
+  hours: number;
+  overtime: number;
+}
+
+interface SubCompanyTotals {
+  totalWorkers: number;
+  white: number;
+  blue: number;
+  present: number;
+  absent: number;
+  hours: number;
+  overtime: number;
+}
+
+interface StatProject {
+  projectId: string;
+  projectName: string;
+  main: {
+    workers: number; white: number; blue: number;
+    present: number; absent: number; adminLeave: number;
+    dayOff: number; restDayWork: number; otherLeave: number;
+    hours: number; overtime: number;
+  };
+  sub: {
+    workers: number; white: number; blue: number;
+    present: number; absent: number;
+    hours: number; overtime: number;
+  };
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function turkishDay(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const days = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+  return days[d.getDay()];
+}
+
+function shortDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+}
+
+function getPresetRange(key: string): [Date, Date] {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  switch (key) {
+    case "today": return [today, today];
+    case "yesterday": { const y = new Date(today); y.setDate(y.getDate() - 1); return [y, y]; }
+    case "thisWeek": { const day = today.getDay(); const diff = day === 0 ? 6 : day - 1; const s = new Date(today); s.setDate(s.getDate() - diff); return [s, today]; }
+    case "lastWeek": { const day = today.getDay(); const diff = day === 0 ? 6 : day - 1; const ws = new Date(today); ws.setDate(ws.getDate() - diff); const ls = new Date(ws); ls.setDate(ls.getDate() - 7); const le = new Date(ws); le.setDate(le.getDate() - 1); return [ls, le]; }
+    case "thisMonth": return [new Date(now.getFullYear(), now.getMonth(), 1), today];
+    case "lastMonth": return [new Date(now.getFullYear(), now.getMonth() - 1, 1), new Date(now.getFullYear(), now.getMonth(), 0)];
+    case "last7": { const s = new Date(today); s.setDate(s.getDate() - 6); return [s, today]; }
+    case "last30": { const s = new Date(today); s.setDate(s.getDate() - 29); return [s, today]; }
+    default: return [today, today];
+  }
 }
 
 export default function PuantajDashboard() {
   const [projectStats, setProjectStats] = useState<ProjectStat[]>([]);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [mainStats, setMainStats] = useState<CompanyTypeStats | null>(null);
-  const [subStats, setSubStats] = useState<CompanyTypeStats | null>(null);
+  const [mainDashStats, setMainDashStats] = useState<{ totalWorkers: number; white: number; blue: number; whitePresent: number; bluePresent: number; todayPresent: number; todayLeave: number; companyName: string; monthTotalHours: number; monthOvertime: number } | null>(null);
+  const [subDashStats, setSubDashStats] = useState<{ totalWorkers: number; white: number; blue: number; whitePresent: number; bluePresent: number; todayPresent: number; totalCompanies: number; monthTotalHours: number; monthOvertime: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [summaryView, setSummaryView] = useState<"daily" | "monthly" | "total">("daily");
 
   const today = useMemo(() => formatDate(new Date()), []);
   const currentMonth = useMemo(() => {
@@ -75,16 +157,83 @@ export default function PuantajDashboard() {
     fetch(`/api/puantaj/dashboard?date=${today}&month=${currentMonth}`)
       .then((r) => r.json())
       .then((data) => {
-        setStats(data.stats);
-        setMainStats(data.mainStats);
-        setSubStats(data.subStats);
         setProjectStats(
           (data.projectStats || []).filter((ps: ProjectStat) => ps.projectId)
         );
+        if (data.mainStats) setMainDashStats({ totalWorkers: data.mainStats.totalWorkers, white: data.mainStats.white ?? 0, blue: data.mainStats.blue ?? 0, whitePresent: data.mainStats.whitePresent ?? 0, bluePresent: data.mainStats.bluePresent ?? 0, todayPresent: data.mainStats.todayPresent, todayLeave: data.mainStats.todayLeave ?? 0, companyName: data.mainStats.companyName ?? "", monthTotalHours: data.mainStats.monthTotalHours ?? 0, monthOvertime: data.mainStats.monthOvertime ?? 0 });
+        if (data.subStats) setSubDashStats({ totalWorkers: data.subStats.totalWorkers, white: data.subStats.white ?? 0, blue: data.subStats.blue ?? 0, whitePresent: data.subStats.whitePresent ?? 0, bluePresent: data.subStats.bluePresent ?? 0, todayPresent: data.subStats.todayPresent, totalCompanies: data.subStats.totalCompanies ?? 0, monthTotalHours: data.subStats.monthTotalHours ?? 0, monthOvertime: data.subStats.monthOvertime ?? 0 });
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [today, currentMonth]);
+
+  // ─── İstatistik (tarih aralığı) ───
+  const [startDate, setStartDate] = useState(() => {
+    const [s] = getPresetRange("thisWeek");
+    return formatDate(s);
+  });
+  const [endDate, setEndDate] = useState(() => formatDate(new Date()));
+  const [preset, setPreset] = useState("thisWeek");
+  const [mainCompany, setMainCompany] = useState<CompanyTotals | null>(null);
+  const [subCompany, setSubCompany] = useState<SubCompanyTotals | null>(null);
+  const [statProjects, setStatProjects] = useState<StatProject[]>([]);
+  const [dailyStats, setDailyStats] = useState<DayStat[]>([]);
+  const [totalDays, setTotalDays] = useState(0);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [subFilterProject, setSubFilterProject] = useState("all");
+
+  const handlePreset = (key: string) => {
+    setPreset(key);
+    if (key === "custom") return;
+    const [s, e] = getPresetRange(key);
+    setStartDate(formatDate(s));
+    setEndDate(formatDate(e));
+  };
+
+  useEffect(() => {
+    setStatsLoading(true);
+    fetch(`/api/puantaj/istatistik?startDate=${startDate}&endDate=${endDate}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setMainCompany(data.mainCompany || null);
+        setSubCompany(data.subCompany || null);
+        setStatProjects(data.projects || []);
+        setDailyStats(data.dailyStats || []);
+        setTotalDays(data.totalDays || 0);
+      })
+      .catch(console.error)
+      .finally(() => setStatsLoading(false));
+  }, [startDate, endDate]);
+
+  const chartData = useMemo(
+    () => dailyStats.map((d) => ({
+      name: `${shortDate(d.date)} ${turkishDay(d.date)}`,
+      Gelen: d.present,
+      Gelmeyen: d.absent,
+      İzinli: d.leave,
+    })),
+    [dailyStats]
+  );
+
+  // Alt Yüklenici proje filtresi
+  const filteredSubProjects = useMemo(() => {
+    const subs = statProjects.filter(p => p.sub.workers > 0);
+    if (subFilterProject === "all") return subs;
+    return subs.filter(p => p.projectId === subFilterProject);
+  }, [statProjects, subFilterProject]);
+
+  const filteredSubTotals = useMemo(() => {
+    if (subFilterProject === "all" && subCompany) {
+      return { workers: subCompany.totalWorkers, present: subCompany.present, absent: subCompany.absent, hours: subCompany.hours, overtime: subCompany.overtime };
+    }
+    return {
+      workers: filteredSubProjects.reduce((s, p) => s + p.sub.workers, 0),
+      present: filteredSubProjects.reduce((s, p) => s + p.sub.present, 0),
+      absent: filteredSubProjects.reduce((s, p) => s + p.sub.absent, 0),
+      hours: Math.round(filteredSubProjects.reduce((s, p) => s + p.sub.hours, 0) * 10) / 10,
+      overtime: Math.round(filteredSubProjects.reduce((s, p) => s + p.sub.overtime, 0) * 10) / 10,
+    };
+  }, [filteredSubProjects, subCompany, subFilterProject]);
 
   if (loading) {
     return (
@@ -115,78 +264,192 @@ export default function PuantajDashboard() {
         <p className="text-muted-foreground text-sm mt-1">
           Puantaj girişi yapmak istediğiniz projeyi seçin
         </p>
+        <p className="text-sm font-medium text-muted-foreground mt-2">
+          {new Date().toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        </p>
       </div>
 
-      {/* Ana Firma / Taşeron Özeti */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Ana Firma */}
-          <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/10">
-            <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-blue-700 dark:text-blue-400">
-                <Building2 className="h-4 w-4" />
-                {mainStats?.companyName || "Ana Firma"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <div className="grid grid-cols-4 gap-2">
-                <MiniStat
-                  icon={<Users className="h-4 w-4" />}
-                  label="Çalışan"
-                  value={mainStats?.totalWorkers ?? 0}
-                />
-                <MiniStat
-                  icon={<UserCheck className="h-4 w-4 text-green-600" />}
-                  label="Gelen"
-                  value={mainStats?.todayPresent ?? 0}
-                  color="text-green-600"
-                />
-                <MiniStat
-                  icon={<UserX className="h-4 w-4 text-red-600" />}
-                  label="Gelmedi"
-                  value={mainStats?.todayAbsent ?? 0}
-                  color="text-red-600"
-                />
-                <MiniStat
-                  icon={<TrendingUp className="h-4 w-4 text-orange-600" />}
-                  label="Mesai"
-                  value={mainStats?.monthOvertime ?? 0}
-                  color="text-orange-600"
-                />
-              </div>
-            </CardContent>
-          </Card>
+      {/* Bugünkü Özet: Ana Firma & Alt Yüklenici */}
+      {(mainDashStats || subDashStats) && (
+        <div className="space-y-3">
+          {/* Günlük / Aylık / Toplam seçici */}
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
+            {(["daily", "monthly", "total"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setSummaryView(v)}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  summaryView === v ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {v === "daily" ? "Günlük" : v === "monthly" ? "Aylık" : "Toplam"}
+              </button>
+            ))}
+          </div>
 
-          {/* Taşeron */}
-          <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
-            <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                <HardHat className="h-4 w-4" />
-                Taşeron ({subStats?.totalCompanies ?? 0})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <div className="grid grid-cols-3 gap-2">
-                <MiniStat
-                  icon={<Users className="h-4 w-4" />}
-                  label="Çalışan"
-                  value={subStats?.totalWorkers ?? 0}
-                />
-                <MiniStat
-                  icon={<UserCheck className="h-4 w-4 text-green-600" />}
-                  label="Bugün Gelen"
-                  value={subStats?.todayPresent ?? 0}
-                  color="text-green-600"
-                />
-                <MiniStat
-                  icon={<TrendingUp className="h-4 w-4 text-orange-600" />}
-                  label="Mesai"
-                  value={subStats?.monthOvertime ?? 0}
-                  color="text-orange-600"
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {mainDashStats && (
+            <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/20">
+              <CardContent className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-semibold">{mainDashStats.companyName || "Ana Firma"}</span>
+                </div>
+                {summaryView === "daily" && (
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-sky-600">{mainDashStats.white}</p>
+                      <p className="text-[10px] text-muted-foreground">B.Yaka</p>
+                      <p className="text-[10px] text-green-600 font-medium">{mainDashStats.whitePresent} geldi</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-indigo-600">{mainDashStats.blue}</p>
+                      <p className="text-[10px] text-muted-foreground">M.Yaka</p>
+                      <p className="text-[10px] text-green-600 font-medium">{mainDashStats.bluePresent} geldi</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold">{mainDashStats.totalWorkers}</p>
+                      <p className="text-[10px] text-muted-foreground">Toplam</p>
+                      <p className="text-[10px] text-green-600 font-medium">{mainDashStats.todayPresent} geldi</p>
+                    </div>
+                  </div>
+                )}
+                {summaryView === "monthly" && (
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-sky-600">{mainDashStats.white}</p>
+                      <p className="text-[10px] text-muted-foreground">B.Yaka</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-indigo-600">{mainDashStats.blue}</p>
+                      <p className="text-[10px] text-muted-foreground">M.Yaka</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold">{mainDashStats.totalWorkers}</p>
+                      <p className="text-[10px] text-muted-foreground">Toplam</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold text-blue-600">{Math.round(mainDashStats.monthTotalHours).toLocaleString("tr-TR")}</p>
+                      <p className="text-[10px] text-muted-foreground">Saat</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-orange-600">{Math.round(mainDashStats.monthOvertime)}</p>
+                      <p className="text-[10px] text-muted-foreground">Mesai</p>
+                    </div>
+                  </div>
+                )}
+                {summaryView === "total" && (
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-sky-600">{mainDashStats.white}</p>
+                      <p className="text-[10px] text-muted-foreground">B.Yaka</p>
+                      <p className="text-[10px] text-green-600 font-medium">{mainDashStats.whitePresent} geldi</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-indigo-600">{mainDashStats.blue}</p>
+                      <p className="text-[10px] text-muted-foreground">M.Yaka</p>
+                      <p className="text-[10px] text-green-600 font-medium">{mainDashStats.bluePresent} geldi</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold">{mainDashStats.totalWorkers}</p>
+                      <p className="text-[10px] text-muted-foreground">Toplam</p>
+                      <p className="text-[10px] text-green-600 font-medium">{mainDashStats.todayPresent} geldi</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold text-blue-600">{Math.round(mainDashStats.monthTotalHours).toLocaleString("tr-TR")}</p>
+                      <p className="text-[10px] text-muted-foreground">Saat</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-orange-600">{Math.round(mainDashStats.monthOvertime)}</p>
+                      <p className="text-[10px] text-muted-foreground">Mesai</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          {subDashStats && subDashStats.totalWorkers > 0 && (
+            <Card className="border-orange-200 bg-orange-50/30 dark:bg-orange-950/20">
+              <CardContent className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <HardHat className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm font-semibold">Alt Yüklenici</span>
+                  {subDashStats.totalCompanies > 0 && <span className="text-xs text-muted-foreground">({subDashStats.totalCompanies} firma)</span>}
+                </div>
+                {summaryView === "daily" && (
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-sky-600">{subDashStats.white}</p>
+                      <p className="text-[10px] text-muted-foreground">B.Yaka</p>
+                      <p className="text-[10px] text-green-600 font-medium">{subDashStats.whitePresent} geldi</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-indigo-600">{subDashStats.blue}</p>
+                      <p className="text-[10px] text-muted-foreground">M.Yaka</p>
+                      <p className="text-[10px] text-green-600 font-medium">{subDashStats.bluePresent} geldi</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold">{subDashStats.totalWorkers}</p>
+                      <p className="text-[10px] text-muted-foreground">Toplam</p>
+                      <p className="text-[10px] text-green-600 font-medium">{subDashStats.todayPresent} geldi</p>
+                    </div>
+                  </div>
+                )}
+                {summaryView === "monthly" && (
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-sky-600">{subDashStats.white}</p>
+                      <p className="text-[10px] text-muted-foreground">B.Yaka</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-indigo-600">{subDashStats.blue}</p>
+                      <p className="text-[10px] text-muted-foreground">M.Yaka</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold">{subDashStats.totalWorkers}</p>
+                      <p className="text-[10px] text-muted-foreground">Toplam</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold text-blue-600">{Math.round(subDashStats.monthTotalHours).toLocaleString("tr-TR")}</p>
+                      <p className="text-[10px] text-muted-foreground">Saat</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-orange-600">{Math.round(subDashStats.monthOvertime)}</p>
+                      <p className="text-[10px] text-muted-foreground">Mesai</p>
+                    </div>
+                  </div>
+                )}
+                {summaryView === "total" && (
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-sky-600">{subDashStats.white}</p>
+                      <p className="text-[10px] text-muted-foreground">B.Yaka</p>
+                      <p className="text-[10px] text-green-600 font-medium">{subDashStats.whitePresent} geldi</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-indigo-600">{subDashStats.blue}</p>
+                      <p className="text-[10px] text-muted-foreground">M.Yaka</p>
+                      <p className="text-[10px] text-green-600 font-medium">{subDashStats.bluePresent} geldi</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold">{subDashStats.totalWorkers}</p>
+                      <p className="text-[10px] text-muted-foreground">Toplam</p>
+                      <p className="text-[10px] text-green-600 font-medium">{subDashStats.todayPresent} geldi</p>
+                    </div>
+                    <div className="border-l pl-4 text-center">
+                      <p className="text-lg font-bold text-blue-600">{Math.round(subDashStats.monthTotalHours).toLocaleString("tr-TR")}</p>
+                      <p className="text-[10px] text-muted-foreground">Saat</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-orange-600">{Math.round(subDashStats.monthOvertime)}</p>
+                      <p className="text-[10px] text-muted-foreground">Mesai</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          </div>
         </div>
       )}
 
@@ -208,6 +471,297 @@ export default function PuantajDashboard() {
           ))}
         </div>
       )}
+
+      {/* ════════════════════════════════════════════════════ */}
+      {/* İstatistikler Bölümü                                */}
+      {/* ════════════════════════════════════════════════════ */}
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+          <BarChart3 className="h-5 w-5 text-primary" />
+          İstatistikler
+        </h2>
+
+        {/* Tarih Aralığı */}
+        <Card className="mb-4">
+          <CardContent className="py-3 px-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { key: "today", label: "Bugün" },
+                    { key: "yesterday", label: "Dün" },
+                    { key: "thisWeek", label: "Bu Hafta" },
+                    { key: "lastWeek", label: "Geçen Hafta" },
+                    { key: "last7", label: "Son 7 Gün" },
+                    { key: "thisMonth", label: "Bu Ay" },
+                    { key: "lastMonth", label: "Geçen Ay" },
+                    { key: "last30", label: "Son 30 Gün" },
+                  ].map((p) => (
+                    <Button
+                      key={p.key}
+                      variant={preset === p.key ? "default" : "outline"}
+                      size="sm"
+                      className="text-xs h-7 px-2.5"
+                      onClick={() => handlePreset(p.key)}
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-end gap-2 shrink-0">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Başlangıç</Label>
+                  <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPreset("custom"); }} className="h-8 text-sm w-36" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Bitiş</Label>
+                  <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPreset("custom"); }} className="h-8 text-sm w-36" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── ANA FİRMA ── */}
+        {mainCompany && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <Building2 className="h-5 w-5 text-blue-600" />
+              <h3 className="text-base font-semibold">Ana Firma</h3>
+              <Badge variant="outline">{mainCompany.totalWorkers} çalışan</Badge>
+              <Badge variant="secondary" className="text-[11px]">B.Yaka: {mainCompany.white}</Badge>
+              <Badge variant="secondary" className="text-[11px]">M.Yaka: {mainCompany.blue}</Badge>
+            </div>
+
+            {statProjects.filter(p => p.main.workers > 0).length > 0 ? (
+              <>
+                {/* Tablo */}
+                <Card className="mb-3">
+                  <CardContent className="px-0 py-2">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Proje</TableHead>
+                            <TableHead className="text-xs text-center">Toplam</TableHead>
+                            <TableHead className="text-xs text-center text-green-700">Gelen</TableHead>
+                            <TableHead className="text-xs text-center text-blue-700">İ.İzin</TableHead>
+                            <TableHead className="text-xs text-center text-amber-700">H.Tatili</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {statProjects.filter(p => p.main.workers > 0).map(p => (
+                            <TableRow key={p.projectId}>
+                              <TableCell className="text-xs font-medium py-1.5">{p.projectName}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5 font-semibold">{p.main.workers}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5 font-semibold text-green-700">{p.main.present}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5"><span className={p.main.adminLeave > 0 ? "text-blue-600 font-semibold" : "text-muted-foreground"}>{p.main.adminLeave || "-"}</span></TableCell>
+                              <TableCell className="text-xs text-center py-1.5"><span className={p.main.dayOff > 0 ? "text-amber-600 font-semibold" : "text-muted-foreground"}>{p.main.dayOff || "-"}</span></TableCell>
+                            </TableRow>
+                          ))}
+                          {statProjects.filter(p => p.main.workers > 0).length > 1 && (
+                            <TableRow className="bg-muted/40 font-semibold">
+                              <TableCell className="text-xs py-1.5">Toplam</TableCell>
+                              <TableCell className="text-xs text-center py-1.5">{mainCompany.totalWorkers}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5 text-green-700">{mainCompany.present}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5 text-blue-600">{mainCompany.adminLeave}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5 text-amber-600">{mainCompany.dayOff}</TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Grafik */}
+                {statProjects.filter(p => p.main.workers > 0).length > 0 && (
+                  <Card className="mb-3">
+                    <CardContent className="px-2 py-3">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart
+                          data={statProjects.filter(p => p.main.workers > 0).map(p => ({
+                            name: p.projectName.length > 15 ? p.projectName.slice(0, 15) + "…" : p.projectName,
+                            Toplam: p.main.workers,
+                            Gelen: p.main.present,
+                            "İ.İzin": p.main.adminLeave,
+                            "H.Tatili": p.main.dayOff,
+                          }))}
+                          margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} width={30} />
+                          <Tooltip contentStyle={{ fontSize: 12 }} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Bar dataKey="Toplam" fill="#94a3b8" radius={[2, 2, 0, 0]} />
+                          <Bar dataKey="Gelen" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                          <Bar dataKey="İ.İzin" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                          <Bar dataKey="H.Tatili" fill="#f59e0b" radius={[2, 2, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground mb-3">Bu dönemde ana firma puantaj kaydı yok.</p>
+            )}
+          </div>
+        )}
+
+        {/* ── ALT YÜKLENİCİ ── */}
+        {subCompany && subCompany.totalWorkers > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <HardHat className="h-5 w-5 text-orange-600" />
+              <h3 className="text-base font-semibold">Alt Yüklenici</h3>
+              <Badge variant="outline">{subCompany.totalWorkers} çalışan</Badge>
+            </div>
+
+            {statProjects.filter(p => p.sub.workers > 0).length > 0 ? (
+              <>
+                {/* Tablo */}
+                <Card className="mb-3">
+                  <CardContent className="px-0 py-2">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Proje</TableHead>
+                            <TableHead className="text-xs text-center">Toplam</TableHead>
+                            <TableHead className="text-xs text-center text-green-700">Gelen</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {statProjects.filter(p => p.sub.workers > 0).map(p => (
+                            <TableRow key={p.projectId}>
+                              <TableCell className="text-xs font-medium py-1.5">{p.projectName}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5 font-semibold">{p.sub.workers}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5 font-semibold text-green-700">{p.sub.present}</TableCell>
+                            </TableRow>
+                          ))}
+                          {statProjects.filter(p => p.sub.workers > 0).length > 1 && (
+                            <TableRow className="bg-muted/40 font-semibold">
+                              <TableCell className="text-xs py-1.5">Toplam</TableCell>
+                              <TableCell className="text-xs text-center py-1.5">{subCompany.totalWorkers}</TableCell>
+                              <TableCell className="text-xs text-center py-1.5 text-green-700">{subCompany.present}</TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Grafik */}
+                {statProjects.filter(p => p.sub.workers > 0).length > 0 && (
+                  <Card className="mb-3">
+                    <CardContent className="px-2 py-3">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart
+                          data={statProjects.filter(p => p.sub.workers > 0).map(p => ({
+                            name: p.projectName.length > 15 ? p.projectName.slice(0, 15) + "…" : p.projectName,
+                            Toplam: p.sub.workers,
+                            Gelen: p.sub.present,
+                          }))}
+                          margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} width={30} />
+                          <Tooltip contentStyle={{ fontSize: 12 }} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Bar dataKey="Toplam" fill="#94a3b8" radius={[2, 2, 0, 0]} />
+                          <Bar dataKey="Gelen" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground mb-3">Bu dönemde alt yüklenici puantaj kaydı yok.</p>
+            )}
+          </div>
+        )}
+
+        {/* Gün Gün Grafik */}
+        {chartData.length > 1 && (
+          <Card className="mb-4">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                Günlük Devam Durumu
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-4">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={chartData.length > 14 ? Math.floor(chartData.length / 10) : 0} />
+                  <YAxis tick={{ fontSize: 11 }} width={35} />
+                  <Tooltip contentStyle={{ fontSize: 12 }} labelStyle={{ fontWeight: 600 }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="Gelen" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="Gelmeyen" fill="#ef4444" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="İzinli" fill="#f59e0b" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Gün Gün Tablo */}
+        {dailyStats.length > 0 && dailyStats.length <= 31 && (
+          <Card className="mb-4">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                Günlük Detay
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-0 pb-2">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs w-28">Tarih</TableHead>
+                      <TableHead className="text-xs text-center">Gün</TableHead>
+                      <TableHead className="text-xs text-center text-green-700">Gelen</TableHead>
+                      <TableHead className="text-xs text-center text-red-700">Gelmeyen</TableHead>
+                      <TableHead className="text-xs text-center text-amber-700">İzinli</TableHead>
+                      <TableHead className="text-xs text-center">Kayıt</TableHead>
+                      <TableHead className="text-xs text-center">Saat</TableHead>
+                      <TableHead className="text-xs text-center text-orange-700">Mesai</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dailyStats.map((d) => {
+                      const dateObj = new Date(d.date + "T00:00:00");
+                      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                      return (
+                        <TableRow key={d.date} className={isWeekend ? "bg-muted/40" : ""}>
+                          <TableCell className="text-xs font-medium py-1.5">{dateObj.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}</TableCell>
+                          <TableCell className="text-xs text-center py-1.5"><span className={isWeekend ? "text-red-500 font-medium" : "text-muted-foreground"}>{turkishDay(d.date)}</span></TableCell>
+                          <TableCell className="text-xs text-center py-1.5 font-semibold text-green-700">{d.present || "-"}</TableCell>
+                          <TableCell className="text-xs text-center py-1.5"><span className={d.absent > 0 ? "font-semibold text-red-600" : "text-muted-foreground"}>{d.absent || "-"}</span></TableCell>
+                          <TableCell className="text-xs text-center py-1.5"><span className={d.leave > 0 ? "text-amber-600" : "text-muted-foreground"}>{d.leave || "-"}</span></TableCell>
+                          <TableCell className="text-xs text-center py-1.5 text-muted-foreground">{d.total || "-"}</TableCell>
+                          <TableCell className="text-xs text-center py-1.5">{d.hours > 0 ? d.hours.toLocaleString("tr-TR") : "-"}</TableCell>
+                          <TableCell className="text-xs text-center py-1.5"><span className={d.overtime > 0 ? "text-orange-600 font-medium" : "text-muted-foreground"}>{d.overtime > 0 ? d.overtime.toLocaleString("tr-TR") : "-"}</span></TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+      </div>
     </div>
   );
 }
@@ -242,12 +796,12 @@ function ProjectPuantajCard({ stat }: { stat: ProjectStat }) {
             <p className="text-[10px] text-muted-foreground">Toplam</p>
           </div>
           <div className="rounded-lg border p-2">
-            <p className="text-lg font-bold text-green-600">{stat.todayPresent}</p>
-            <p className="text-[10px] text-muted-foreground">Gelen</p>
+            <p className="text-lg font-bold text-blue-600">{stat.mainPresent}</p>
+            <p className="text-[10px] text-muted-foreground">Ana Firma Geldi</p>
           </div>
           <div className="rounded-lg border p-2">
-            <p className="text-lg font-bold text-red-600">{stat.todayAbsent}</p>
-            <p className="text-[10px] text-muted-foreground">Gelmeyen</p>
+            <p className="text-lg font-bold text-orange-600">{stat.subPresent}</p>
+            <p className="text-[10px] text-muted-foreground">Alt Yüklenici Geldi</p>
           </div>
         </div>
 
@@ -298,7 +852,7 @@ function ProjectPuantajCard({ stat }: { stat: ProjectStat }) {
           <Button variant="outline" size="sm" className="w-full" asChild>
             <Link href={`/puantaj/taseron?project=${pid}`}>
               <HardHat className="h-3.5 w-3.5 mr-1" />
-              Taşeron
+              Alt Yüklenici
             </Link>
           </Button>
         </div>
@@ -329,28 +883,16 @@ function ProjectPuantajCard({ stat }: { stat: ProjectStat }) {
   );
 }
 
-/* ─── Küçük İstatistik Kartı ─── */
-function MiniStat({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  color?: string;
-}) {
+/* ─── Özet Kart ─── */
+function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number | string; color?: string }) {
   return (
-    <Card className="py-0">
+    <Card>
       <CardContent className="px-3 py-3">
-        <div className="flex items-center gap-2 mb-1 text-muted-foreground">
+        <div className="flex items-center gap-1.5 mb-1 text-muted-foreground">
           {icon}
-          <span className="text-xs">{label}</span>
+          <span className="text-[11px]">{label}</span>
         </div>
-        <p className={`text-xl font-bold ${color ?? ""}`}>
-          {value.toLocaleString("tr-TR")}
-        </p>
+        <p className={`text-xl font-bold ${color ?? ""}`}>{value}</p>
       </CardContent>
     </Card>
   );

@@ -14,7 +14,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 const SEGMENTS = [
   { value: "all", label: "Tümü" },
   { value: "MAIN", label: "🏢 Ana Yüklenici" },
-  { value: "SUBCONTRACTOR", label: "🛠️ Taşeron" },
+  { value: "SUBCONTRACTOR", label: "🛠️ Alt Yüklenici" },
 ] as const;
 
 interface CompanyTypeSegmentProps {

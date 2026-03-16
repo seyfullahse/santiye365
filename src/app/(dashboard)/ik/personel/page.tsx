@@ -36,6 +36,7 @@ interface Employee {
   emergencyName: string | null;
   emergencyPhone: string | null;
   emergencyRelation: string | null;
+  collarType: string | null;
   companyId: string | null;
   departmentId: string | null;
   positionId: string | null;
@@ -61,13 +62,14 @@ const genderMap: Record<string, string> = { MALE: "Erkek", FEMALE: "Kadın" };
 const maritalMap: Record<string, string> = { SINGLE: "Bekar", MARRIED: "Evli", DIVORCED: "Boşanmış", WIDOWED: "Dul" };
 const bloodMap: Record<string, string> = { A_POS: "A+", A_NEG: "A-", B_POS: "B+", B_NEG: "B-", AB_POS: "AB+", AB_NEG: "AB-", O_POS: "0+", O_NEG: "0-" };
 const salaryTypeMap: Record<string, string> = { MONTHLY: "Aylık", DAILY: "Günlük", HOURLY: "Saatlik" };
+const collarTypeMap: Record<string, string> = { BLUE: "Mavi Yaka", WHITE: "Beyaz Yaka" };
 
 const emptyForm = {
   firstName: "", lastName: "", tcNo: "", phone: "", email: "", employeeNo: "",
   hireDate: "", status: "ACTIVE", salary: "", salaryType: "", gender: "", maritalStatus: "",
   bloodType: "", birthDate: "", birthPlace: "", address: "", sgkNo: "", sgkStartDate: "",
   emergencyName: "", emergencyPhone: "", emergencyRelation: "",
-  companyId: "", departmentId: "", positionId: "", projectId: "", teamId: "",
+  collarType: "", companyId: "", departmentId: "", positionId: "", projectId: "", teamId: "",
 };
 
 export default function PersonelPage() {
@@ -96,8 +98,8 @@ export default function PersonelPage() {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
-    if (statusFilter) params.set("status", statusFilter);
-    if (deptFilter) params.set("departmentId", deptFilter);
+    if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+    if (deptFilter && deptFilter !== "all") params.set("departmentId", deptFilter);
     const res = await fetch(`/api/ik/personel?${params}`);
     const data = await res.json();
     setEmployees(data.employees || []);
@@ -153,7 +155,7 @@ export default function PersonelPage() {
       sgkStartDate: emp.sgkStartDate?.split("T")[0] || "",
       emergencyName: emp.emergencyName || "", emergencyPhone: emp.emergencyPhone || "",
       emergencyRelation: emp.emergencyRelation || "",
-      companyId: emp.companyId || "", departmentId: emp.departmentId || "",
+      collarType: emp.collarType || "", companyId: emp.companyId || "", departmentId: emp.departmentId || "",
       positionId: emp.positionId || "", projectId: emp.projectId || "", teamId: emp.teamId || "",
     });
     setDialogOpen(true);
@@ -176,7 +178,7 @@ export default function PersonelPage() {
   const exportCSV = () => {
     const headers = [
       "Ad", "Soyad", "TC Kimlik No", "Sicil No", "Telefon", "E-posta",
-      "Departman", "Pozisyon", "Şirket", "Proje", "Ekip",
+      "Yaka Tipi", "Departman", "Pozisyon", "Şirket", "Proje", "Ekip",
       "Cinsiyet", "Medeni Durum", "Kan Grubu", "Doğum Tarihi", "Doğum Yeri",
       "Adres", "SGK No", "SGK Giriş Tarihi", "İşe Giriş Tarihi",
       "Maaş", "Maaş Türü", "Durum",
@@ -184,7 +186,7 @@ export default function PersonelPage() {
     ];
     const rows = employees.map((e) => [
       e.firstName, e.lastName, e.tcNo || "", e.employeeNo || "", e.phone || "", e.email || "",
-      e.department?.name || "", e.position?.name || "", e.company?.name || "",
+      collarTypeMap[e.collarType || ""] || "", e.department?.name || "", e.position?.name || "", e.company?.name || "",
       e.project?.name || "", e.team?.name || "",
       genderMap[e.gender || ""] || "", maritalMap[e.maritalStatus || ""] || "",
       bloodMap[e.bloodType || ""] || "",
@@ -205,7 +207,7 @@ export default function PersonelPage() {
   const downloadCSVTemplate = () => {
     const headers = [
       "Ad", "Soyad", "TC Kimlik No", "Sicil No", "Telefon", "E-posta",
-      "Departman", "Pozisyon", "Şirket", "Proje", "Ekip",
+      "Yaka Tipi", "Departman", "Pozisyon", "Şirket", "Proje", "Ekip",
       "Cinsiyet", "Medeni Durum", "Kan Grubu", "Doğum Tarihi", "Doğum Yeri",
       "Adres", "SGK No", "SGK Giriş Tarihi", "İşe Giriş Tarihi",
       "Maaş", "Maaş Türü", "Durum",
@@ -213,7 +215,7 @@ export default function PersonelPage() {
     ];
     const example = [
       "Ahmet", "Yılmaz", "12345678901", "S001", "05551234567", "ahmet@firma.com",
-      "Şantiye/Saha", "Şantiye Şefi", "ABC İnşaat", "", "",
+      "Mavi Yaka", "Şantiye/Saha", "Şantiye Şefi", "ABC İnşaat", "", "",
       "Erkek", "Evli", "A+", "15.03.1985", "İstanbul",
       "Kadıköy, İstanbul", "1234567890", "01.01.2024", "01.01.2024",
       "25000", "Aylık", "Aktif",
@@ -225,6 +227,7 @@ export default function PersonelPage() {
     const a = document.createElement("a"); a.href = url; a.download = "personel-sablonu.csv"; a.click();
   };
 
+  const reverseCollarType: Record<string, string> = { "Mavi Yaka": "BLUE", "Beyaz Yaka": "WHITE" };
   const reverseGender: Record<string, string> = { "Erkek": "MALE", "Kadın": "FEMALE" };
   const reverseMarital: Record<string, string> = { "Bekar": "SINGLE", "Evli": "MARRIED", "Boşanmış": "DIVORCED", "Dul": "WIDOWED" };
   const reverseBlood: Record<string, string> = { "A+": "A_POS", "A-": "A_NEG", "B+": "B_POS", "B-": "B_NEG", "AB+": "AB_POS", "AB-": "AB_NEG", "0+": "O_POS", "0-": "O_NEG" };
@@ -292,6 +295,7 @@ export default function PersonelPage() {
       const iSicil = colIdx(["Sicil No", "sicilNo", "employeeNo"]);
       const iTel = colIdx(["Telefon", "telefon", "phone"]);
       const iEmail = colIdx(["E-posta", "email", "Email"]);
+      const iCollar = colIdx(["Yaka Tipi", "yakaTipi", "collarType", "Yaka"]);
       const iDept = colIdx(["Departman", "departman", "department"]);
       const iPos = colIdx(["Pozisyon", "pozisyon", "position"]);
       const iComp = colIdx(["Şirket", "şirket", "sirket", "company"]);
@@ -363,6 +367,7 @@ export default function PersonelPage() {
           employeeNo: parseCell(cells, iSicil) || null,
           phone: parseCell(cells, iTel) || null,
           email: parseCell(cells, iEmail) || null,
+          collarType: (() => { const cv = parseCell(cells, iCollar); return reverseCollarType[cv] || (cv.toUpperCase() === "BLUE" || cv.toUpperCase() === "WHITE" ? cv.toUpperCase() : null); })(),
           departmentId, positionId, companyId, projectId, teamId,
           gender: reverseGender[genderVal] || (genderVal.toUpperCase() === "MALE" || genderVal.toUpperCase() === "FEMALE" ? genderVal.toUpperCase() : null),
           maritalStatus: reverseMarital[maritalVal] || null,
@@ -480,6 +485,15 @@ export default function PersonelPage() {
 
                 <TabsContent value="organizasyon" className="space-y-4 pt-4">
                   <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Yaka Tipi</Label>
+                      <Select value={form.collarType} onValueChange={(v) => setField("collarType", v)}>
+                        <SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="BLUE">Mavi Yaka</SelectItem>
+                          <SelectItem value="WHITE">Beyaz Yaka</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div><Label>Şirket</Label>
                       <Select value={form.companyId} onValueChange={(v) => setField("companyId", v)}>
                         <SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger>
@@ -600,6 +614,7 @@ export default function PersonelPage() {
                   <TableRow>
                     <TableHead>Sicil No</TableHead>
                     <TableHead>Ad Soyad</TableHead>
+                    <TableHead>Yaka Tipi</TableHead>
                     <TableHead>Departman</TableHead>
                     <TableHead>Pozisyon</TableHead>
                     <TableHead>Şirket</TableHead>
@@ -614,6 +629,13 @@ export default function PersonelPage() {
                     <TableRow key={emp.id}>
                       <TableCell className="font-mono text-xs">{emp.employeeNo || "-"}</TableCell>
                       <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
+                      <TableCell>
+                        {emp.collarType ? (
+                          <Badge variant={emp.collarType === "BLUE" ? "default" : "secondary"}>
+                            {collarTypeMap[emp.collarType] || "-"}
+                          </Badge>
+                        ) : "-"}
+                      </TableCell>
                       <TableCell>{emp.department?.name || "-"}</TableCell>
                       <TableCell>{emp.position?.name || "-"}</TableCell>
                       <TableCell>{emp.company?.name || "-"}</TableCell>

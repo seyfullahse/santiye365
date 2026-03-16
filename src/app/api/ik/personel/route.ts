@@ -26,10 +26,10 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    if (status) where.status = status;
-    if (departmentId) where.departmentId = departmentId;
-    if (companyId) where.companyId = companyId;
-    if (projectId) where.projectId = projectId;
+    if (status && status !== "all") where.status = status;
+    if (departmentId && departmentId !== "all") where.departmentId = departmentId;
+    if (companyId && companyId !== "all") where.companyId = companyId;
+    if (projectId && projectId !== "all") where.projectId = projectId;
 
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({
@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
         emergencyName: body.emergencyName || null,
         emergencyPhone: body.emergencyPhone || null,
         emergencyRelation: body.emergencyRelation || null,
+        collarType: body.collarType || null,
         companyId: body.companyId || null,
         departmentId: body.departmentId || null,
         positionId: body.positionId || null,

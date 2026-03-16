@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const companyType = req.nextUrl.searchParams.get("companyType");
+    const companyId = req.nextUrl.searchParams.get("companyId");
+
+    const where: Record<string, unknown> = {};
+    if (companyType) {
+      where.company = { type: companyType };
+    }
+    if (companyId) {
+      where.companyId = companyId;
+    }
+
     const teams = await prisma.team.findMany({
+      where,
       include: {
         company: { select: { id: true, name: true, type: true, sortOrder: true } },
         discipline: { select: { name: true } },

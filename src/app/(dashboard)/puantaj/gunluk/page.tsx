@@ -37,13 +37,14 @@ import {
   Sun,
   Moon,
   FolderKanban,
+  Minus,
 } from "lucide-react";
 import { PuantajPagination } from "../components";
 import * as XLSX from "xlsx";
 import Link from "next/link";
 
 // ─── Tipler ──────────────────────────────────────────────
-type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "ANNUAL_LEAVE" | "PAID_LEAVE" | "UNPAID_LEAVE" | "SICK_LEAVE" | "DAY_OFF" | "REST_DAY_WORK";
+type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "ANNUAL_LEAVE" | "PAID_LEAVE" | "UNPAID_LEAVE" | "SICK_LEAVE" | "ADMINISTRATIVE_LEAVE" | "DAY_OFF" | "REST_DAY_WORK";
 type ShiftType = "DAY" | "NIGHT";
 
 interface Team {
@@ -81,6 +82,8 @@ interface EditRow {
   totalHours: number;
   overtime: number;
   note: string;
+  hasRecord: boolean;
+  isDirty: boolean;
 }
 
 const STATUS_LABELS: Record<AttendanceStatus, string> = {
@@ -91,6 +94,7 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   PAID_LEAVE: "Ücretli İzin",
   UNPAID_LEAVE: "Ücretsiz İzin",
   SICK_LEAVE: "Raporlu",
+  ADMINISTRATIVE_LEAVE: "İdari İzin",
   DAY_OFF: "Hafta Tatili",
   REST_DAY_WORK: "H.Tatil Mesai",
 };
@@ -103,6 +107,7 @@ const STATUS_COLORS: Record<AttendanceStatus, string> = {
   PAID_LEAVE: "bg-teal-500",
   UNPAID_LEAVE: "bg-orange-500",
   SICK_LEAVE: "bg-purple-500",
+  ADMINISTRATIVE_LEAVE: "bg-indigo-500",
   DAY_OFF: "bg-gray-400",
   REST_DAY_WORK: "bg-orange-500",
 };
@@ -209,10 +214,12 @@ function GunlukPuantajPage() {
           map.set(w.id, {
             workerId: w.id,
             shift: att?.shift ?? "DAY",
-            status: att?.status ?? "ABSENT",
+            status: (att?.status as AttendanceStatus) ?? "ABSENT",
             totalHours: att?.totalHours ?? 0,
             overtime: att?.overtime ?? 0,
             note: att?.note ?? "",
+            hasRecord: !!att,
+            isDirty: false,
           });
         });
         setEditRows(map);
@@ -230,7 +237,7 @@ function GunlukPuantajPage() {
     setEditRows((prev) => {
       const next = new Map(prev);
       const row = next.get(workerId);
-      if (row) next.set(workerId, { ...row, ...patch });
+      if (row) next.set(workerId, { ...row, ...patch, isDirty: true });
       return next;
     });
     setHasChanges(true);
@@ -252,7 +259,7 @@ function GunlukPuantajPage() {
     setEditRows((prev) => {
       const next = new Map(prev);
       next.forEach((row, key) => {
-        next.set(key, { ...row, status: "PRESENT", totalHours: 8 });
+        next.set(key, { ...row, status: "PRESENT", totalHours: 8, isDirty: true });
       });
       return next;
     });
@@ -263,7 +270,7 @@ function GunlukPuantajPage() {
     setEditRows((prev) => {
       const next = new Map(prev);
       next.forEach((row, key) => {
-        next.set(key, { ...row, status: "ABSENT", totalHours: 0, overtime: 0 });
+        next.set(key, { ...row, status: "ABSENT", totalHours: 0, overtime: 0, isDirty: true });
       });
       return next;
     });
@@ -274,14 +281,21 @@ function GunlukPuantajPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const records = Array.from(editRows.values()).map((r) => ({
-        workerId: r.workerId,
-        shift: r.shift,
-        status: r.status,
-        totalHours: r.totalHours,
-        overtime: r.overtime,
-        note: r.note,
-      }));
+      const records = Array.from(editRows.values())
+        .filter((r) => r.isDirty)
+        .map((r) => ({
+          workerId: r.workerId,
+          shift: r.shift,
+          status: r.status,
+          totalHours: r.totalHours,
+          overtime: r.overtime,
+          note: r.note,
+        }));
+      if (records.length === 0) {
+        setHasChanges(false);
+        setSaving(false);
+        return;
+      }
       const res = await fetch("/api/puantaj", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -315,7 +329,7 @@ function GunlukPuantajPage() {
         "Ad Soyad": `${w.firstName} ${w.lastName}`,
         Görevi: w.role,
         Vardiya: row?.shift === "NIGHT" ? "Gece" : "Gündüz",
-        Durum: row ? STATUS_LABELS[row.status] : "Gelmedi",
+        Durum: row && (row.hasRecord || row.isDirty) ? STATUS_LABELS[row.status] : "Kayıt Yok",
         "Çalışma Saati": row?.totalHours ?? 0,
         "Mesai Saati": row?.overtime ?? 0,
         Not: row?.note ?? "",
@@ -329,18 +343,19 @@ function GunlukPuantajPage() {
 
   // ─── İstatistikler ──────────────────────────────────
   const stats = useMemo(() => {
-    let total = 0, present = 0, absent = 0, halfDay = 0, dayOff = 0, leave = 0, totalHours = 0, totalOvertime = 0;
+    let total = 0, present = 0, absent = 0, halfDay = 0, dayOff = 0, leave = 0, noRecord = 0, totalHours = 0, totalOvertime = 0;
     editRows.forEach((r) => {
       total++;
-      if (r.status === "PRESENT" || r.status === "REST_DAY_WORK") present++;
+      if (!r.hasRecord && !r.isDirty) { noRecord++; }
+      else if (r.status === "PRESENT" || r.status === "REST_DAY_WORK") present++;
       else if (r.status === "ABSENT") absent++;
       else if (r.status === "HALF_DAY") halfDay++;
       else if (r.status === "DAY_OFF") dayOff++;
-      else if (["ANNUAL_LEAVE", "PAID_LEAVE", "UNPAID_LEAVE", "SICK_LEAVE"].includes(r.status)) leave++;
+      else if (["ANNUAL_LEAVE", "PAID_LEAVE", "UNPAID_LEAVE", "SICK_LEAVE", "ADMINISTRATIVE_LEAVE"].includes(r.status)) leave++;
       totalHours += r.totalHours;
       totalOvertime += r.overtime;
     });
-    return { total, present, absent, halfDay, dayOff, leave, totalHours, totalOvertime };
+    return { total, present, absent, halfDay, dayOff, leave, noRecord, totalHours, totalOvertime };
   }, [editRows]);
 
   // Firmaya göre gruplanmış çalışanlar (sayfalanmış)
@@ -388,12 +403,11 @@ function GunlukPuantajPage() {
       </div>
 
       {/* İstatistik kartları */}
-      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         <MiniStat icon={<Users className="h-3.5 w-3.5" />} value={stats.total} label="Toplam" />
         <MiniStat icon={<UserCheck className="h-3.5 w-3.5 text-green-600" />} value={stats.present} label="Geldi" color="text-green-600" />
         <MiniStat icon={<UserX className="h-3.5 w-3.5 text-red-600" />} value={stats.absent} label="Gelmedi" color="text-red-600" />
-        <MiniStat icon={<Clock className="h-3.5 w-3.5 text-blue-600" />} value={stats.halfDay} label="Yarım Gün" color="text-blue-600" />
-        <MiniStat icon={<Clock className="h-3.5 w-3.5 text-amber-600" />} value={stats.leave} label="İzinli" color="text-amber-600" />
+        <MiniStat icon={<Clock className="h-3.5 w-3.5 text-amber-600" />} value={stats.leave} label="İdari İzinli" color="text-amber-600" />
         <MiniStat icon={<Clock className="h-3.5 w-3.5 text-gray-500" />} value={stats.dayOff} label="H. Tatili" color="text-gray-500" />
         <MiniStat icon={<Clock className="h-3.5 w-3.5 text-orange-600" />} value={stats.totalOvertime} label="Mesai" color="text-orange-600" />
       </div>
@@ -490,7 +504,7 @@ function GunlukPuantajPage() {
                       const row = editRows.get(w.id);
                       if (!row) return null;
                       return (
-                        <TableRow key={w.id}>
+                        <TableRow key={w.id} className={!row.hasRecord && !row.isDirty ? "bg-muted/20" : ""}>
                           <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
                           <TableCell className="text-xs">{w.team.company.name}</TableCell>
                           <TableCell className="text-xs">{w.team.name}</TableCell>
@@ -516,11 +530,19 @@ function GunlukPuantajPage() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <Select value={row.status} onValueChange={(v) => changeStatus(w.id, v as AttendanceStatus)}>
-                              <SelectTrigger className="h-8 w-36">
+                            <Select value={!row.hasRecord && !row.isDirty ? "NO_RECORD" : row.status} onValueChange={(v) => changeStatus(w.id, v as AttendanceStatus)}>
+                              <SelectTrigger className={`h-8 w-36 ${!row.hasRecord && !row.isDirty ? "text-muted-foreground border-dashed" : ""}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent position="popper" className="max-h-60">
+                                {!row.hasRecord && !row.isDirty && (
+                                  <SelectItem value="NO_RECORD" disabled>
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" />
+                                      Kayıt Yok
+                                    </div>
+                                  </SelectItem>
+                                )}
                                 {(Object.keys(STATUS_LABELS) as AttendanceStatus[]).map((s) => (
                                   <SelectItem key={s} value={s}>
                                     <div className="flex items-center gap-2">

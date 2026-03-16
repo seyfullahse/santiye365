@@ -35,6 +35,8 @@ async function main() {
     "Altyapı",
     "Peyzaj",
     "Mobilya",
+    "İnşaat",
+    "Merkez Ofis",
   ];
 
   for (const name of disciplines) {

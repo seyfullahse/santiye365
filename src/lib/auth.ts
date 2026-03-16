@@ -55,6 +55,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       // Her token yenilenmesinde DB'den güncel rolü al
       if (token.id && !user) {
+        // İmpersonation durumunda orijinal adminin bilgilerini koru
+        if (token.isImpersonating) {
+          try {
+            const dbUser = await (prisma.user as any).findUnique({
+              where: { id: token.id as string },
+              select: { role: true, name: true, isActive: true },
+            });
+            if (dbUser) {
+              token.role = dbUser.role;
+              token.name = dbUser.name;
+              if (dbUser.isActive === false) return {} as any;
+            }
+          } catch {}
+          return token;
+        }
         try {
           const dbUser = await (prisma.user as any).findUnique({
             where: { id: token.id as string },
@@ -73,6 +88,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.role = token.role as string;
         session.user.id = token.id as string;
+        // İmpersonation bilgilerini session'a aktar
+        if (token.isImpersonating) {
+          session.user.isImpersonating = true;
+          session.user.originalAdminId = token.originalAdminId as string;
+          session.user.originalAdminName = token.originalAdminName as string;
+        }
       }
       return session;
     },

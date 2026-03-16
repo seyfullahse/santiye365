@@ -24,11 +24,11 @@ function PuantajLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   const tabs = [
-    { name: "Firma Puantaj", href: `/puantaj/gunluk?project=${projectId}`, icon: CalendarDays, match: "/puantaj/gunluk" },
-    { name: "Taşeron Puantaj", href: `/puantaj/taseron?project=${projectId}`, icon: HardHat, match: "/puantaj/taseron" },
-    { name: "Aylık Özet", href: `/puantaj/aylik?project=${projectId}`, icon: CalendarRange, match: "/puantaj/aylik" },
-    { name: "Çalışanlar", href: `/puantaj/calisanlar?project=${projectId}`, icon: Users, match: "/puantaj/calisanlar" },
+    { name: "Özet", href: `/puantaj/aylik?project=${projectId}`, icon: CalendarRange, match: "/puantaj/aylik" },
     { name: "Raporlar", href: `/puantaj/raporlar?project=${projectId}`, icon: BarChart3, match: "/puantaj/raporlar" },
+    { name: "Günlük Firma Puantajı", href: `/puantaj/gunluk?project=${projectId}`, icon: CalendarDays, match: "/puantaj/gunluk" },
+    { name: "Günlük Alt Yüklenici Puantajı", href: `/puantaj/taseron?project=${projectId}`, icon: HardHat, match: "/puantaj/taseron" },
+    { name: "Çalışanlar", href: `/puantaj/calisanlar?project=${projectId}`, icon: Users, match: "/puantaj/calisanlar" },
   ];
 
   return (

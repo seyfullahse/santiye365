@@ -135,6 +135,7 @@ function CalisanlarPage() {
 
   // Filtreler
   const [search, setSearch] = useState("");
+  const [companyTypeTab, setCompanyTypeTab] = useState<"all" | "MAIN" | "SUBCONTRACTOR">("all");
   const [filterCompany, setFilterCompany] = useState("all");
   const [filterTeam, setFilterTeam] = useState("all");
   const [pageSize, setPageSize] = useState(25);
@@ -153,6 +154,7 @@ function CalisanlarPage() {
   const [poolLoading, setPoolLoading] = useState(false);
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<Set<string>>(new Set());
   const [assigning, setAssigning] = useState(false);
+  const [poolCompanyType, setPoolCompanyType] = useState<"MAIN" | "SUBCONTRACTOR">("MAIN");
 
   // Proje yönlendirme
   useEffect(() => {
@@ -200,6 +202,7 @@ function CalisanlarPage() {
   /* ─── Filtreleme ─── */
   const filtered = useMemo(() => {
     return workers.filter((w) => {
+      if (companyTypeTab !== "all" && w.team.company.type !== companyTypeTab) return false;
       if (search) {
         const q = search.toLowerCase();
         const match = `${w.firstName} ${w.lastName} ${w.role} ${w.identityNo ?? ""} ${w.phone ?? ""}`.toLowerCase();
@@ -209,7 +212,7 @@ function CalisanlarPage() {
       if (filterTeam !== "all" && w.team.id !== filterTeam) return false;
       return true;
     });
-  }, [workers, search, filterCompany, filterTeam]);
+  }, [workers, search, companyTypeTab, filterCompany, filterTeam]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedFiltered = useMemo(() => {
@@ -311,14 +314,16 @@ function CalisanlarPage() {
     setAssignDialogOpen(true);
     setSelectedWorkerIds(new Set());
     setPoolSearch("");
-    fetchPool("");
+    setPoolCompanyType("MAIN");
+    fetchPool("", "MAIN");
   };
 
-  const fetchPool = async (q: string) => {
+  const fetchPool = async (q: string, type?: string) => {
     if (!projectId) return;
     setPoolLoading(true);
     try {
-      const params = new URLSearchParams({ companyType: "MAIN" });
+      const ct = type || poolCompanyType;
+      const params = new URLSearchParams({ companyType: ct });
       if (q) params.set("search", q);
       const res = await fetch(`/api/projeler/${projectId}/puantaj/havuz?${params}`);
       const data = await res.json();
@@ -343,10 +348,16 @@ function CalisanlarPage() {
     if (selectedWorkerIds.size === 0) return;
     setAssigning(true);
     try {
+      // Havuzda Employee mi Worker mı olduğunu kontrol et
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hasEmployees = poolWorkers.some((p: any) => p._isEmployee);
+      const ids = Array.from(selectedWorkerIds);
+      const payload = hasEmployees ? { employeeIds: ids } : { workerIds: ids };
+
       const res = await fetch(`/api/projeler/${projectId}/puantaj/atamalar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workerIds: Array.from(selectedWorkerIds) }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Atama başarısız");
       setAssignDialogOpen(false);
@@ -396,10 +407,10 @@ function CalisanlarPage() {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary">
-            <Building2 className="h-3 w-3 mr-1" /> {mainCount} firma
+            <Building2 className="h-3 w-3 mr-1" /> {mainCount} ana firma
           </Badge>
           <Badge variant="outline">
-            <Users className="h-3 w-3 mr-1" /> {subCount} taşeron
+            <Users className="h-3 w-3 mr-1" /> {subCount} alt yüklenici
           </Badge>
           <Button size="sm" variant="outline" onClick={openAssignDialog}>
             <UserPlus className="h-4 w-4 mr-1" /> Personel Ata
@@ -408,6 +419,26 @@ function CalisanlarPage() {
             <Plus className="h-4 w-4 mr-1" /> Yeni Çalışan
           </Button>
         </div>
+      </div>
+
+      {/* Ana Firma / Alt Yüklenici Sekmeleri */}
+      <div className="flex gap-1 border-b">
+        {(["all", "MAIN", "SUBCONTRACTOR"] as const).map((tab) => {
+          const label = tab === "all" ? `Tümü (${workers.length})` : tab === "MAIN" ? `Ana Firma (${mainCount})` : `Alt Yükleniciler (${subCount})`;
+          return (
+            <button
+              key={tab}
+              onClick={() => { setCompanyTypeTab(tab); setFilterCompany("all"); setFilterTeam("all"); setCurrentPage(1); }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                companyTypeTab === tab
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Filtreler */}
@@ -550,8 +581,27 @@ function CalisanlarPage() {
               <UserPlus className="inline h-5 w-5 mr-2" />
               Projeye Personel Ata
             </DialogTitle>
-            <p className="text-sm text-muted-foreground">Ana firma çalışanlarından seçin</p>
           </DialogHeader>
+
+          {/* Ana Firma / Alt Yüklenici Toggle */}
+          <div className="flex gap-1 border rounded-lg p-1 bg-muted/30">
+            <button
+              onClick={() => { setPoolCompanyType("MAIN"); setSelectedWorkerIds(new Set()); setPoolSearch(""); fetchPool("", "MAIN"); }}
+              className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                poolCompanyType === "MAIN" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              🏢 Ana Firma (İK)
+            </button>
+            <button
+              onClick={() => { setPoolCompanyType("SUBCONTRACTOR"); setSelectedWorkerIds(new Set()); setPoolSearch(""); fetchPool("", "SUBCONTRACTOR"); }}
+              className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                poolCompanyType === "SUBCONTRACTOR" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              🛠️ Alt Yükleniciler
+            </button>
+          </div>
 
           {/* Arama */}
           <div className="relative">

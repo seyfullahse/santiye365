@@ -82,17 +82,20 @@ export default function AyarlarPage() {
       setThemeMode(document.documentElement.classList.contains("dark") ? "dark" : "light");
     }
 
-    // Load notification prefs
-    const savedNotif = localStorage.getItem("notification-prefs");
-    if (savedNotif) {
+    // Load notification prefs from DB
+    async function loadNotifPrefs() {
       try {
-        const prefs = JSON.parse(savedNotif);
-        setEmailNotif(prefs.email ?? true);
-        setDuyuruNotif(prefs.duyuru ?? true);
-        setRiskNotif(prefs.risk ?? true);
-        setOnayNotif(prefs.onay ?? true);
+        const res = await fetch("/api/bildirimler/tercihler");
+        if (res.ok) {
+          const prefs = await res.json();
+          setEmailNotif(prefs.ANNOUNCEMENT?.email ?? true);
+          setDuyuruNotif(prefs.ANNOUNCEMENT?.inApp ?? true);
+          setRiskNotif(prefs.SLA_WARNING?.inApp ?? true);
+          setOnayNotif(prefs.APPROVAL_PENDING?.inApp ?? true);
+        }
       } catch { /* ignore */ }
     }
+    loadNotifPrefs();
   }, []);
 
   /* ─── Load profile data ─── */
@@ -192,15 +195,36 @@ export default function AyarlarPage() {
   };
 
   /* ─── Notification prefs save ─── */
-  const handleNotifSave = () => {
-    const prefs = {
-      email: emailNotif,
-      duyuru: duyuruNotif,
-      risk: riskNotif,
-      onay: onayNotif,
-    };
-    localStorage.setItem("notification-prefs", JSON.stringify(prefs));
-    toast.success("Bildirim tercihleri kaydedildi");
+  const [notifSaving, setNotifSaving] = useState(false);
+  const handleNotifSave = async () => {
+    setNotifSaving(true);
+    try {
+      const body: Record<string, { inApp: boolean; email: boolean }> = {
+        ANNOUNCEMENT: { inApp: duyuruNotif, email: emailNotif },
+        APPROVAL_PENDING: { inApp: onayNotif, email: emailNotif },
+        APPROVAL_APPROVED: { inApp: onayNotif, email: emailNotif },
+        APPROVAL_REJECTED: { inApp: onayNotif, email: emailNotif },
+        SLA_WARNING: { inApp: riskNotif, email: emailNotif },
+        SYSTEM: { inApp: true, email: emailNotif },
+        REMINDER: { inApp: true, email: false },
+        LEAVE_REQUEST: { inApp: true, email: false },
+        PROJECT_ASSIGNMENT: { inApp: true, email: emailNotif },
+      };
+      const res = await fetch("/api/bildirimler/tercihler", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        toast.success("Bildirim tercihleri kaydedildi");
+      } else {
+        toast.error("Tercihler kaydedilemedi");
+      }
+    } catch {
+      toast.error("Tercihler kaydedilemedi");
+    } finally {
+      setNotifSaving(false);
+    }
   };
 
   const roleBadge = (role: string) => {
@@ -470,16 +494,16 @@ export default function AyarlarPage() {
             onChange={setOnayNotif}
           />
 
-          <div className="flex justify-end pt-2">
-            <Button onClick={handleNotifSave} variant="outline" className="gap-2">
-              <Save className="h-4 w-4" />
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2 text-xs text-green-600">
+              <Check className="h-3.5 w-3.5" />
+              <span>Bildirim altyapısı aktif</span>
+            </div>
+            <Button onClick={handleNotifSave} variant="outline" className="gap-2" disabled={notifSaving}>
+              {notifSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Tercihleri Kaydet
             </Button>
           </div>
-
-          <p className="text-xs text-muted-foreground italic">
-            Not: Bildirim altyapısı yakında aktif edilecektir. Tercihleriniz şimdi kaydedilir.
-          </p>
         </CardContent>
       </Card>
     </div>

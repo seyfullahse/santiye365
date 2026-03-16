@@ -1,7 +1,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { AppSidebar } from "./app-sidebar";
+import { ImpersonationBanner } from "./impersonation-banner";
 
 /**
  * Dashboard kabuk bileşeni — sidebar'ın gösterilip gösterilmeyeceğini
@@ -10,11 +12,14 @@ import { AppSidebar } from "./app-sidebar";
  */
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
   // /projeler tam sayfa olacak, sidebar yok
   const hideSidebar = pathname === "/projeler";
+  const isImpersonating = !!(session?.user as any)?.isImpersonating;
 
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${isImpersonating ? "pt-10" : ""}`}>
+      {isImpersonating && <ImpersonationBanner />}
       {!hideSidebar && <AppSidebar />}
       <main className={hideSidebar ? "" : "lg:pl-64"}>
         <div className={`${hideSidebar ? "" : "pt-18 lg:pt-0"} min-h-screen flex flex-col`}>

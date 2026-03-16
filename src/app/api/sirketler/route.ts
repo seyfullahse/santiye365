@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const includeMain = req.nextUrl.searchParams.get("includeMain") === "true";
     const companies = await prisma.company.findMany({
+      where: includeMain ? {} : { type: { not: "MAIN" } },
       include: { _count: { select: { teams: true } } },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
@@ -18,12 +20,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
-    // MAIN firma zaten varsa, tekrar oluşturmayı engelle
+    // MAIN firma bu endpoint'ten oluşturulamaz — Organizasyon/Profil'den yönetilir
     if (body.type === "MAIN") {
-      const existing = await prisma.company.findFirst({ where: { type: "MAIN" } });
-      if (existing) {
-        return NextResponse.json({ error: "Ana firma zaten mevcut. Sadece bir ana firma olabilir." }, { status: 409 });
-      }
+      return NextResponse.json({ error: "Ana firma bu sayfadan oluşturulamaz. Organizasyon > Profil sayfasını kullanın." }, { status: 403 });
     }
     
     const company = await prisma.company.create({

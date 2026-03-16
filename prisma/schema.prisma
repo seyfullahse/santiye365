@@ -32,12 +32,21 @@ model User {
   taseronPuantajlar   TaseronPuantaj[]   @relation("TaseronPuantajCreator")
   taseronPerformanslar TaseronPerformans[] @relation("TaseronPerformansEvaluator")
 
+  // Yetki & Bildirim İlişkileri
+  userPermissions     UserPermission[]
+  auditLogs           AuditLog[]
+  approvalRequests    ApprovalRequest[]   @relation("ApprovalRequester")
+  approvalActions     ApprovalRequest[]   @relation("ApprovalActioner")
+  notifications       Notification[]
+  notificationPrefs   NotificationPreference[]
+
   @@map("users")
 }
 
 enum UserRole {
   SUPER_ADMIN
   ADMIN
+  PROJECT_ADMIN
   MANAGER
   MUHASEBE
   USER
@@ -72,6 +81,7 @@ model Project {
   teams       Team[]
   workerAssignments ProjectWorkerAssignment[]
   taseronPuantajlar TaseronPuantaj[]
+  userPermissions    UserPermission[]
 
   @@map("projects")
 }
@@ -278,6 +288,7 @@ model Company {
   taseronTeminatlar    TaseronTeminat[]
   taseronEvraklar      TaseronEvrak[]
   taseronPuantajlar    TaseronPuantaj[]
+  userPermissions      UserPermission[]
 
   @@map("companies")
 }
@@ -312,6 +323,7 @@ model Team {
 model Worker {
   id               String      @id @default(cuid())
   teamId           String      @map("team_id")
+  employeeId       String?     @unique @map("employee_id") // İK Employee bağlantısı (ana firma)
   firstName        String      @map("first_name")
   lastName         String      @map("last_name")
   role             String                               // Görevi (Kalıpçı, Formen, Elektrikçi vb.)
@@ -331,6 +343,7 @@ model Worker {
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
+  employee      Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   team          Team           @relation(fields: [teamId], references: [id], onDelete: Restrict)
   attendances   Attendance[]
   leaveRequests WorkerLeave[]
@@ -413,6 +426,7 @@ enum AttendanceStatus {
   UNPAID_LEAVE  // Ücretsiz izin
   ANNUAL_LEAVE  // Yıllık izin
   SICK_LEAVE    // Raporlu
+  ADMINISTRATIVE_LEAVE // İdari izin
   DAY_OFF       // Hafta tatili
   REST_DAY_WORK // Hafta tatili mesaisi
 }
@@ -779,6 +793,9 @@ model Employee {
   emergencyPhone    String?  @map("emergency_phone")
   emergencyRelation String?  @map("emergency_relation")
 
+  // Yaka Tipi
+  collarType        CollarType? @map("collar_type")
+
   // Organizasyon
   companyId         String?  @map("company_id")
   departmentId      String?  @map("department_id")
@@ -832,6 +849,9 @@ model Employee {
 
   // Sistem Kullanıcı Hesabı (opsiyonel — 1:0..1)
   user              User?
+
+  // Puantaj Çalışan Bağlantısı (opsiyonel — 1:0..1)
+  worker            Worker?
 
   @@map("employees")
 }
@@ -2343,4 +2363,237 @@ model EmployeeDiscount {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("employee_discounts")
+}
+
+// ═══════════════════════════════════════════════════════════
+// ═══ MODÜL 1: ROL & YETKİ YÖNETİMİ ═══════════════════════
+// ═══════════════════════════════════════════════════════════
+
+// ─── İZİN TANIMLARI ──────────────────────────────────────
+model Permission {
+  id          String   @id @default(cuid())
+  module      String                          // projeler, puantaj, hakedis, ik, isg, muhasebe...
+  action      String                          // read, create, update, delete, approve, request
+  description String?                         // Türkçe açıklama
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+// ─── ROL VARSAYILAN İZİNLER ──────────────────────────────
+model RolePermission {
+  id           String        @id @default(cuid())
+  role         UserRole
+  permissionId String        @map("permission_id")
+  scope        PermissionScope @default(NONE)
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@map("role_permissions")
+}
+
+// ─── KULLANICI ÖZEL İZİNLER ──────────────────────────────
+model UserPermission {
+  id           String          @id @default(cuid())
+  userId       String          @map("user_id")
+  permissionId String          @map("permission_id")
+  scope        PermissionScope @default(NONE)
+  projectId    String?         @map("project_id")     // Proje bazlı kısıtlama
+  companyId    String?         @map("company_id")     // Firma bazlı kısıtlama
+  granted      Boolean         @default(true)          // true=izin ver, false=izin kaldır (override)
+  grantedBy    String?         @map("granted_by")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  expiresAt    DateTime?       @map("expires_at")     // Geçici yetki desteği
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  project      Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  company      Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, permissionId, projectId, companyId])
+  @@map("user_permissions")
+}
+
+enum PermissionScope {
+  NONE        // İzin yok
+  SELF        // Sadece kendi verileri
+  PROJECT     // Proje kapsamı
+  COMPANY     // Firma kapsamı
+  GLOBAL      // Tüm veriye erişim
+}
+
+// ─── DENETİM KAYITLARI ───────────────────────────────────
+model AuditLog {
+  id          String     @id @default(cuid())
+  userId      String?    @map("user_id")
+  action      AuditAction
+  module      String                          // Hangi modülde işlem yapıldı
+  entityType  String?    @map("entity_type")   // Model adı (Project, Employee...)
+  entityId    String?    @map("entity_id")     // Kaydın ID'si
+  oldData     Json?      @map("old_data")      // Önceki değerler
+  newData     Json?      @map("new_data")      // Yeni değerler
+  description String?    @db.Text              // İnsan okunabilir açıklama
+  ipAddress   String?    @map("ip_address")
+  userAgent   String?    @map("user_agent") @db.Text
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  user        User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([module])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  APPROVE
+  REJECT
+  EXPORT
+  PERMISSION_CHANGE
+}
+
+// ═══════════════════════════════════════════════════════════
+// ═══ MODÜL 2: WORKFLOW & BİLDİRİM ════════════════════════
+// ═══════════════════════════════════════════════════════════
+
+// ─── ONAY ZİNCİRİ ŞABLONU ───────────────────────────────
+model ApprovalChain {
+  id          String   @id @default(cuid())
+  name        String                          // "İzin Talebi Onayı", "Hakediş Onayı"...
+  module      String                          // leave, hakedis, malzeme, puantaj
+  isActive    Boolean  @default(true) @map("is_active")
+  slaHours    Int      @default(48) @map("sla_hours")  // Varsayılan SLA süresi
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  steps       ApprovalStep[]
+  requests    ApprovalRequest[]
+
+  @@unique([module])
+  @@map("approval_chains")
+}
+
+// ─── ONAY ZİNCİR ADIMLARI ───────────────────────────────
+model ApprovalStep {
+  id            String          @id @default(cuid())
+  chainId       String          @map("chain_id")
+  stepOrder     Int             @map("step_order")     // 1, 2, 3...
+  name          String                                  // "Direkt Yönetici", "İK Onayı"...
+  approverType  ApproverType    @map("approver_type")
+  approverRole  UserRole?       @map("approver_role")  // Rol bazlı: hangi rol onaylar
+  approverId    String?         @map("approver_id")    // Sabit kişi bazlı
+  autoAssign    Boolean         @default(false) @map("auto_assign") // managerId'den otomatik ata
+  slaHours      Int?            @map("sla_hours")      // Adım özel SLA (override)
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  chain         ApprovalChain   @relation(fields: [chainId], references: [id], onDelete: Cascade)
+
+  @@unique([chainId, stepOrder])
+  @@map("approval_steps")
+}
+
+enum ApproverType {
+  ROLE          // Belirli bir rol (ADMIN, MANAGER...)
+  USER          // Sabit bir kullanıcı
+  MANAGER       // Talebi yapanın direkt yöneticisi (employee.managerId)
+  DEPARTMENT    // Departman müdürü
+}
+
+// ─── ONAY TALEPLERİ ─────────────────────────────────────
+model ApprovalRequest {
+  id            String              @id @default(cuid())
+  chainId       String              @map("chain_id")
+  requesterId   String              @map("requester_id")    // Talebi oluşturan
+  entityType    String              @map("entity_type")     // LeaveRequest, Hakedis...
+  entityId      String              @map("entity_id")       // İlgili kaydın ID'si
+  currentStep   Int                 @default(1) @map("current_step")
+  status        WorkflowApprovalStatus @default(PENDING)
+  assignedTo    String?             @map("assigned_to")     // Şu an kimin onayında
+  actionNote    String?             @map("action_note") @db.Text
+  actionAt      DateTime?           @map("action_at")
+  actionBy      String?             @map("action_by")       // Aksiyonu alan kişi
+  slaDeadline   DateTime?           @map("sla_deadline")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  chain         ApprovalChain       @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  requester     User                @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  actioner      User?               @relation("ApprovalActioner", fields: [actionBy], references: [id], onDelete: SetNull)
+
+  @@index([requesterId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([entityType, entityId])
+  @@map("approval_requests")
+}
+
+enum WorkflowApprovalStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  ESCALATED
+  CANCELLED
+}
+
+// ─── BİLDİRİMLER ─────────────────────────────────────────
+model Notification {
+  id          String             @id @default(cuid())
+  userId      String             @map("user_id")
+  type        NotificationType
+  title       String
+  message     String             @db.Text
+  link        String?                                    // Tıklanınca gidilecek sayfa
+  entityType  String?            @map("entity_type")
+  entityId    String?            @map("entity_id")
+  isRead      Boolean            @default(false) @map("is_read")
+  readAt      DateTime?          @map("read_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  APPROVAL_PENDING     // Onay bekliyor
+  APPROVAL_APPROVED    // Onaylandı
+  APPROVAL_REJECTED    // Reddedildi
+  APPROVAL_ESCALATED   // Eskalasyon
+  LEAVE_REQUEST        // İzin talebi
+  ANNOUNCEMENT         // Duyuru
+  PROJECT_ASSIGNMENT   // Proje ataması
+  SLA_WARNING          // SLA uyarısı
+  SYSTEM               // Sistem bildirimi
+  REMINDER             // Hatırlatma
+}
+
+// ─── BİLDİRİM TERCİHLERİ ────────────────────────────────
+model NotificationPreference {
+  id              String             @id @default(cuid())
+  userId          String             @map("user_id")
+  notificationType NotificationType  @map("notification_type")
+  inApp           Boolean            @default(true) @map("in_app")
+  email           Boolean            @default(false)
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationType])
+  @@map("notification_preferences")
 }

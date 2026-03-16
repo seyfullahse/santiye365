@@ -26,6 +26,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Clock,
+  LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,7 @@ interface Stats {
 const roleConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   SUPER_ADMIN: { label: "Süper Admin", color: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800", icon: Crown },
   ADMIN: { label: "Yönetici", color: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-800", icon: ShieldCheck },
+  PROJECT_ADMIN: { label: "Proje Yöneticisi", color: "bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-950 dark:text-teal-400 dark:border-teal-800", icon: Shield },
   MANAGER: { label: "Müdür", color: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800", icon: Shield },
   USER: { label: "Kullanıcı", color: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700", icon: User },
   VIEWER: { label: "İzleyici", color: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800", icon: Eye },
@@ -165,6 +167,7 @@ export default function KullanicilarPage() {
   const [deletingUser, setDeletingUser] = useState<AppUser | null>(null);
 
   const isAuthorized = session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN";
+  const isSuperAdmin = session?.user?.role === "SUPER_ADMIN" && !(session?.user as any)?.isImpersonating;
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -275,8 +278,14 @@ export default function KullanicilarPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        toast.error(err.error || "İşlem başarısız");
+        let errMsg = "İşlem başarısız";
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {
+          errMsg = `Sunucu hatası (${res.status})`;
+        }
+        toast.error(errMsg);
         return;
       }
 
@@ -323,6 +332,27 @@ export default function KullanicilarPage() {
       setDeleteDialogOpen(false);
       setDeletingUser(null);
       fetchUsers();
+    } catch {
+      toast.error("Bir hata oluştu");
+    }
+  };
+
+  const handleImpersonate = async (user: AppUser) => {
+    if (!confirm(`${user.name} (${user.email}) olarak giriş yapmak istediğinize emin misiniz?`)) return;
+    try {
+      const res = await fetch("/api/kullanicilar/impersonate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId: user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Giriş yapılamadı");
+        return;
+      }
+      toast.success(data.message);
+      // Sayfayı yenile — yeni session yüklenecek
+      window.location.href = "/";
     } catch {
       toast.error("Bir hata oluştu");
     }
@@ -476,6 +506,7 @@ export default function KullanicilarPage() {
                   <SelectItem value="ALL">Tüm Roller</SelectItem>
                   <SelectItem value="SUPER_ADMIN">Süper Admin</SelectItem>
                   <SelectItem value="ADMIN">Yönetici</SelectItem>
+                  <SelectItem value="PROJECT_ADMIN">Proje Yöneticisi</SelectItem>
                   <SelectItem value="MANAGER">Müdür</SelectItem>
                   <SelectItem value="USER">Kullanıcı</SelectItem>
                   <SelectItem value="VIEWER">İzleyici</SelectItem>
@@ -564,6 +595,17 @@ export default function KullanicilarPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {isSuperAdmin && user.id !== session?.user.id && user.isActive && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleImpersonate(user)}
+                            title={`${user.name} olarak giriş yap`}
+                            className="h-8 w-8 text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950"
+                          >
+                            <LogIn className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -784,6 +826,12 @@ export default function KullanicilarPage() {
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-blue-500" />
                       Müdür — Departman/alan yönetimi
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="PROJECT_ADMIN">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-teal-500" />
+                      Proje Yöneticisi — Proje, İK, Puantaj
                     </div>
                   </SelectItem>
                   <SelectItem value="USER">

@@ -4,6 +4,7 @@ import { SessionProvider, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -327,11 +328,11 @@ const classicModules: ClassicModule[] = [
   {
     name: "Rol & Yetki Yönetimi",
     icon: Lock,
-    href: "#",
-    color: "bg-slate-600",
+    href: "/roller",
+    color: "bg-violet-600",
     description: "İzin matrisi ve erişim kontrolü",
     features: ["Rol tanımlama", "Yetki matrisi", "Modül bazlı erişim", "Proje bazlı erişim", "Firma bazlı erişim", "Onay yetkileri", "Log kayıtları"],
-    status: "soon",
+    status: "active",
   },
   {
     name: "Workflow & Bildirim",
@@ -657,16 +658,26 @@ function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
   const isSuperAdmin = userRole === "SUPER_ADMIN";
+  const isAdmin = userRole === "ADMIN";
+  const isProjectAdmin = userRole === "PROJECT_ADMIN";
+  const isManager = userRole === "MANAGER";
+  const canSeeModules = isSuperAdmin || isAdmin || isProjectAdmin || isManager;
+
+  // PROJECT_ADMIN sadece bu modülleri görür
+  const projectAdminModuleHrefs = ["/projeler", "/puantaj", "/ik"];
+  const visibleModules = isProjectAdmin
+    ? classicModules.filter((m) => projectAdminModuleHrefs.includes(m.href))
+    : classicModules;
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur-sm">
         <div className="mx-auto max-w-7xl flex h-14 items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <HardHat className="h-4 w-4" />
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg logo-ai-gradient logo-glow-ring logo-shimmer overflow-hidden">
+              <HardHat className="h-4 w-4 text-white logo-hat-float drop-shadow-sm" />
             </div>
-            <span className="text-sm font-bold tracking-tight">Şantiye360</span>
+            <span className="text-sm font-bold tracking-tight bg-gradient-to-r from-violet-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">Şantiye360</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden sm:block text-right">
@@ -700,11 +711,11 @@ function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities 
         </div>
 
         {/* === ÇALIŞAN İNDİRİMLERİ === */}
-        <DiscountWidget />
+        {!isProjectAdmin && <DiscountWidget />}
 
         {/* === KORUNAN ALAN: Modüller + Hızlı Erişim + Aktiviteler === */}
         <div className="relative">
-          {!isSuperAdmin && (
+          {!canSeeModules && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[2px]">
               <div className="flex flex-col items-center gap-3 p-8 rounded-2xl bg-card border shadow-2xl text-center max-w-sm mx-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
@@ -721,79 +732,42 @@ function ClassicView({ userName, userEmail, userRole, kpiData, recentActivities 
               </div>
             </div>
           )}
-          <div className={!isSuperAdmin ? "pointer-events-none select-none filter blur-[6px] opacity-50" : undefined}>
+          <div className={!canSeeModules ? "pointer-events-none select-none filter blur-[6px] opacity-50" : undefined}>
 
         <div>
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Modüller</h2>
             <span className="text-xs text-muted-foreground ml-auto">
-              {classicModules.filter((m) => m.status === "active").length} Aktif · {classicModules.filter((m) => m.status === "soon").length} Yakında
+              {visibleModules.filter((m) => m.status === "active").length} Aktif · {visibleModules.filter((m) => m.status === "soon").length} Yakında
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {classicModules.map((mod) => (
+            {visibleModules.map((mod) => (
               <ClassicModuleCard key={mod.name} mod={mod} />
             ))}
           </div>
         </div>
 
-        {/* Hızlı Erişim + Duyurular — yan yana */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Hızlı Erişim */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Zap className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Hızlı Erişim</h2>
+        {/* Duyurular — PROJECT_ADMIN'den gizle */}
+        {!isProjectAdmin && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Duyurular</h2>
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-              {[
-                { name: "Yönetici Paneli", icon: LayoutDashboard, href: "/yonetim-paneli", color: "bg-orange-500" },
-                { name: "Projeler", icon: FolderKanban, href: "/projeler", color: "bg-blue-600" },
-                { name: "Aktiviteler", icon: Activity, href: "/aktiviteler", color: "bg-green-500" },
-                { name: "Mahaller", icon: MapPin, href: "/mahaller", color: "bg-emerald-500" },
-                { name: "Katlar", icon: Layers, href: "/katlar", color: "bg-teal-500" },
-                { name: "Onaylar", icon: CheckCircle2, href: "/onaylar", color: "bg-amber-500" },
-                { name: "Riskler", icon: AlertTriangle, href: "/riskler", color: "bg-red-500" },
-                { name: "Hakediş", icon: FileText, href: "/hakedis", color: "bg-purple-500" },
-                { name: "Malzemeler", icon: Package, href: "/malzemeler", color: "bg-violet-500" },
-                { name: "Puantaj", icon: ClipboardList, href: "/puantaj", color: "bg-fuchsia-500" },
-              ].map((item) => {
-                const QIcon = item.icon;
-                return (
-                  <Link key={item.name} href={item.href} className="group">
-                    <Card className="hover:shadow-md transition-all hover:scale-[1.03]">
-                      <CardContent className="flex flex-col items-center justify-center py-4 px-2 gap-2">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.color} text-white shadow-sm group-hover:shadow-md transition-shadow`}>
-                          <QIcon className="h-5 w-5" />
-                        </div>
-                        <span className="text-[11px] font-medium text-center leading-tight text-muted-foreground group-hover:text-foreground transition-colors">{item.name}</span>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                );
-              })}
-            </div>
+            <Link href="/duyurular" className="text-xs text-primary hover:underline flex items-center gap-1">
+              Tümünü Gör <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
-
-          {/* Duyurular */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Megaphone className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">Duyurular</h2>
-              </div>
-              <Link href="/duyurular" className="text-xs text-primary hover:underline flex items-center gap-1">
-                Tümünü Gör <ChevronRight className="h-3 w-3" />
-              </Link>
-            </div>
-            <Card className="h-[calc(100%-2.25rem)]">
-              <CardContent className="p-0">
-                <AnnouncementWidget />
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <AnnouncementWidget />
+            </CardContent>
+          </Card>
         </div>
+        )}
 
         {recentActivities.length > 0 && (
           <div>
@@ -1078,8 +1052,8 @@ function AIView({ userName, userEmail, userRole, kpiData }: AnasayfaProps) {
       <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-xl">
         <div className="mx-auto max-w-6xl flex h-14 items-center justify-between px-4 sm:px-6">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/20"><HardHat className="h-4 w-4 text-white" /></div>
-            <div><span className="text-sm font-bold tracking-tight">Şantiye360</span><span className="hidden sm:inline text-[9px] text-white/30 ml-1.5 font-medium tracking-wider">CONSTRUCTION OS</span></div>
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg logo-ai-gradient logo-glow-ring logo-shimmer overflow-hidden"><HardHat className="h-4 w-4 text-white logo-hat-float drop-shadow-sm" /></div>
+            <div><span className="text-sm font-bold tracking-tight bg-gradient-to-r from-violet-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">Şantiye360</span><span className="hidden sm:inline text-[9px] text-white/30 ml-1.5 font-medium tracking-wider">CONSTRUCTION OS</span></div>
           </motion.div>
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} className="flex items-center gap-3">
             {aiLoading && (<div className="flex items-center gap-1.5 text-[10px] text-violet-400 mr-2"><Bot className="h-3 w-3 animate-pulse" /><span className="hidden sm:inline">AI analiz ediyor...</span></div>)}
@@ -1219,6 +1193,7 @@ function AnasayfaContent(props: AnasayfaProps) {
      boş ekran (flash) yaşanmaz */
   return (
     <>
+      <ImpersonationBanner />
       {mounted && <ViewToggle mode={viewMode} onChange={handleViewChange} />}
       {viewMode === "classic" || !mounted ? (
         <ClassicView {...props} />

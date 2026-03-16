@@ -123,11 +123,11 @@ export default function LoginPage() {
         <div className="relative z-10 flex-1 flex flex-col p-8 xl:p-10 2xl:p-12 overflow-y-auto">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-10">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm">
-              <HardHat className="h-6 w-6" />
+            <div className="relative flex h-11 w-11 items-center justify-center rounded-xl logo-ai-gradient logo-glow-ring logo-shimmer overflow-hidden">
+              <HardHat className="h-6 w-6 text-white logo-hat-float drop-shadow-sm" />
             </div>
             <div>
-              <span className="text-2xl font-bold tracking-tight">Şantiye360</span>
+              <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-violet-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">Şantiye360</span>
               <p className="text-blue-300 text-[11px] mt-0.5">Construction Operating System</p>
             </div>
           </div>
@@ -210,11 +210,11 @@ export default function LoginPage() {
         <div className="w-full max-w-[380px]">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <HardHat className="h-6 w-6" />
+            <div className="relative flex h-11 w-11 items-center justify-center rounded-xl logo-ai-gradient logo-glow-ring logo-shimmer overflow-hidden">
+              <HardHat className="h-6 w-6 text-white logo-hat-float drop-shadow-sm" />
             </div>
             <div>
-              <span className="text-xl font-bold">Şantiye360</span>
+              <span className="text-xl font-bold bg-gradient-to-r from-violet-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">Şantiye360</span>
               <p className="text-[10px] text-muted-foreground leading-none">
                 Construction OS
               </p>

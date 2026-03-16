@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useMemo, Fragment, Suspense, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -25,24 +24,29 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle2,
   XCircle,
-  Clock,
   Save,
   Download,
   ChevronLeft,
   ChevronRight,
   Users,
   UserCheck,
-  UserX,
   CalendarDays,
-  Sun,
-  Moon,
   HardHat,
 } from "lucide-react";
 import { PuantajPagination } from "../components";
 import * as XLSX from "xlsx";
 
-type AttendanceStatus = "PRESENT" | "HALF_DAY" | "ABSENT" | "DAY_OFF" | "REST_DAY_WORK";
-type ShiftType = "DAY" | "NIGHT";
+type AttendanceStatus = "PRESENT" | "ABSENT";
+
+const STATUS_LABELS: Record<AttendanceStatus, string> = {
+  PRESENT: "Geldi",
+  ABSENT: "Gelmedi",
+};
+
+const STATUS_COLORS: Record<AttendanceStatus, string> = {
+  PRESENT: "bg-green-500",
+  ABSENT: "bg-red-500",
+};
 
 interface Team {
   id: string;
@@ -55,8 +59,8 @@ interface Team {
 interface AttendanceRecord {
   id?: string;
   date: string;
-  shift: ShiftType;
-  status: AttendanceStatus;
+  shift: string;
+  status: string;
   totalHours: number;
   overtime: number;
   note: string | null;
@@ -74,28 +78,11 @@ interface WorkerRow {
 
 interface EditRow {
   workerId: string;
-  shift: ShiftType;
   status: AttendanceStatus;
-  totalHours: number;
-  overtime: number;
   note: string;
+  hasRecord: boolean;
+  isDirty: boolean;
 }
-
-const STATUS_LABELS: Record<AttendanceStatus, string> = {
-  PRESENT: "Geldi",
-  HALF_DAY: "Yarım Gün",
-  ABSENT: "Gelmedi",
-  DAY_OFF: "Hafta Tatili",
-  REST_DAY_WORK: "H.Tatil Mesai",
-};
-
-const STATUS_COLORS: Record<AttendanceStatus, string> = {
-  PRESENT: "bg-green-500",
-  HALF_DAY: "bg-blue-500",
-  ABSENT: "bg-red-500",
-  DAY_OFF: "bg-gray-400",
-  REST_DAY_WORK: "bg-orange-500",
-};
 
 function formatDate(d: Date): string {
   const year = d.getFullYear();
@@ -193,13 +180,18 @@ function TaseronPuantajPage() {
         const map = new Map<string, EditRow>();
         arr.forEach((w) => {
           const att = w.attendances.find((a) => a.date === date);
+          const hasRecord = !!att;
+          let status: AttendanceStatus = "ABSENT";
+          if (att) {
+            if (att.status === "PRESENT") status = "PRESENT";
+            else status = "ABSENT";
+          }
           map.set(w.id, {
             workerId: w.id,
-            shift: att?.shift ?? "DAY",
-            status: att?.status ?? "ABSENT",
-            totalHours: att?.totalHours ?? 0,
-            overtime: att?.overtime ?? 0,
+            status,
             note: att?.note ?? "",
+            hasRecord,
+            isDirty: false,
           });
         });
         setEditRows(map);
@@ -216,29 +208,21 @@ function TaseronPuantajPage() {
     setEditRows((prev) => {
       const next = new Map(prev);
       const row = next.get(workerId);
-      if (row) next.set(workerId, { ...row, ...patch });
+      if (row) next.set(workerId, { ...row, ...patch, isDirty: true });
       return next;
     });
     setHasChanges(true);
   };
 
   const changeStatus = (workerId: string, status: AttendanceStatus) => {
-    const newHours = status === "PRESENT" ? 8 : status === "HALF_DAY" ? 4 : status === "REST_DAY_WORK" ? 8 : 0;
-    const update: Partial<EditRow> = { status, totalHours: newHours };
-    if (status === "REST_DAY_WORK") update.overtime = newHours;
-    else if (newHours === 0) update.overtime = 0;
-    updateRow(workerId, update);
-  };
-
-  const changeShift = (workerId: string, newShift: ShiftType) => {
-    updateRow(workerId, { shift: newShift });
+    updateRow(workerId, { status });
   };
 
   const markAllPresent = () => {
     setEditRows((prev) => {
       const next = new Map(prev);
       next.forEach((row, key) => {
-        next.set(key, { ...row, status: "PRESENT", totalHours: 8 });
+        next.set(key, { ...row, status: "PRESENT", isDirty: true });
       });
       return next;
     });
@@ -249,7 +233,7 @@ function TaseronPuantajPage() {
     setEditRows((prev) => {
       const next = new Map(prev);
       next.forEach((row, key) => {
-        next.set(key, { ...row, status: "ABSENT", totalHours: 0, overtime: 0 });
+        next.set(key, { ...row, status: "ABSENT", isDirty: true });
       });
       return next;
     });
@@ -259,14 +243,21 @@ function TaseronPuantajPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const records = Array.from(editRows.values()).map((r) => ({
-        workerId: r.workerId,
-        shift: r.shift,
-        status: r.status,
-        totalHours: r.totalHours,
-        overtime: r.overtime,
-        note: r.note,
-      }));
+      const records = Array.from(editRows.values())
+        .filter((r) => r.isDirty)
+        .map((r) => ({
+          workerId: r.workerId,
+          shift: "DAY",
+          status: r.status,
+          totalHours: r.status === "PRESENT" ? 8 : 0,
+          overtime: 0,
+          note: r.note,
+        }));
+      if (records.length === 0) {
+        setHasChanges(false);
+        setSaving(false);
+        return;
+      }
       const res = await fetch("/api/puantaj", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -293,35 +284,51 @@ function TaseronPuantajPage() {
       const row = editRows.get(w.id);
       return {
         "#": i + 1,
-        Taşeron: w.team.company.name,
+        "Alt Yüklenici": w.team.company.name,
         Ekip: w.team.name,
         "Ad Soyad": `${w.firstName} ${w.lastName}`,
         Görevi: w.role,
-        Vardiya: row?.shift === "NIGHT" ? "Gece" : "Gündüz",
-        Durum: row ? STATUS_LABELS[row.status] : "Yok",
-        "Çalışma Saati": row?.totalHours ?? 0,
-        "Mesai Saati": row?.overtime ?? 0,
+        Durum: !row || (!row.hasRecord && !row.isDirty) ? "Kayıt Yok" : row.status === "PRESENT" ? "Geldi" : "Gelmedi",
         Not: row?.note ?? "",
       };
     });
-    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Alt Yüklenici bazlı özet satırları
+    const companyStats = new Map<string, { present: number; absent: number }>();
+    workers.forEach((w) => {
+      const row = editRows.get(w.id);
+      const name = w.team.company.name;
+      if (!companyStats.has(name)) companyStats.set(name, { present: 0, absent: 0 });
+      const s = companyStats.get(name)!;
+      if (row?.status === "PRESENT") s.present++;
+      else s.absent++;
+    });
+
+    const summaryRows = Array.from(companyStats, ([name, s]) => ({
+      "#": "",
+      "Alt Yüklenici": name,
+      Ekip: "",
+      "Ad Soyad": "TOPLAM",
+      Görevi: "",
+      Durum: `${s.present} Geldi / ${s.absent} Gelmedi`,
+      Not: "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet([...rows, {}, ...summaryRows]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Taşeron Puantaj");
+    XLSX.utils.book_append_sheet(wb, ws, "Alt Yüklenici Puantaj");
     XLSX.writeFile(wb, `taseron-puantaj-${date}.xlsx`);
   };
 
   const stats = useMemo(() => {
-    let total = 0, present = 0, absent = 0, halfDay = 0, dayOff = 0, totalHours = 0, totalOvertime = 0;
+    let total = 0, present = 0, absent = 0, noRecord = 0;
     editRows.forEach((r) => {
       total++;
-      if (r.status === "PRESENT") present++;
-      else if (r.status === "ABSENT") absent++;
-      else if (r.status === "HALF_DAY") halfDay++;
-      else if (r.status === "DAY_OFF") dayOff++;
-      totalHours += r.totalHours;
-      totalOvertime += r.overtime;
+      if (!r.hasRecord && !r.isDirty) noRecord++;
+      else if (r.status === "PRESENT") present++;
+      else absent++;
     });
-    return { total, present, absent, halfDay, dayOff, totalHours, totalOvertime };
+    return { total, present, absent, noRecord };
   }, [editRows]);
 
   const totalPages = Math.max(1, Math.ceil(workers.length / pageSize));
@@ -347,11 +354,10 @@ function TaseronPuantajPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <HardHat className="h-6 w-6" />
-            Taşeron Puantaj
+            Alt Yüklenici Puantaj
           </h1>
           <p className="text-muted-foreground text-sm">
-            {projectName} · <CalendarDays className="inline h-4 w-4 mr-1" />
-            {formatDisplayDate(new Date(date + "T00:00:00"))}
+            {projectName} · Şantiyede kimler var?
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -369,22 +375,18 @@ function TaseronPuantajPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-        <MiniStat icon={<Users className="h-3.5 w-3.5" />} value={stats.total} label="Toplam" />
-        <MiniStat icon={<UserCheck className="h-3.5 w-3.5 text-green-600" />} value={stats.present} label="Geldi" color="text-green-600" />
-        <MiniStat icon={<Clock className="h-3.5 w-3.5 text-blue-600" />} value={stats.halfDay} label="Yarım Gün" color="text-blue-600" />
-        <MiniStat icon={<Clock className="h-3.5 w-3.5 text-gray-500" />} value={stats.dayOff} label="H. Tatili" color="text-gray-500" />
-        <MiniStat icon={<Clock className="h-3.5 w-3.5" />} value={stats.totalHours} label="Saat" />
-        <MiniStat icon={<Clock className="h-3.5 w-3.5 text-orange-600" />} value={stats.totalOvertime} label="Mesai" color="text-orange-600" />
+      <div className="grid grid-cols-2 gap-2 max-w-xs">
+        <MiniStat icon={<Users className="h-3.5 w-3.5" />} value={stats.total} label="Kayıtlı" />
+        <MiniStat icon={<UserCheck className="h-3.5 w-3.5 text-green-600" />} value={stats.present} label="Sahada" color="text-green-600" />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v); setFilterTeam("all"); }}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="Taşeron" />
+            <SelectValue placeholder="Alt Yüklenici" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tüm Taşeronlar</SelectItem>
+            <SelectItem value="all">Tüm Alt Yükleniciler</SelectItem>
             {companies.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
@@ -432,8 +434,8 @@ function TaseronPuantajPage() {
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground">
             <HardHat className="h-12 w-12 mx-auto mb-4 opacity-40" />
-            <p className="text-lg font-medium">Taşeron çalışanı bulunamadı</p>
-            <p className="text-sm">Bu projeye atanmış taşeron çalışanı bulunmuyor.</p>
+            <p className="text-lg font-medium">Alt yüklenici çalışanı bulunamadı</p>
+            <p className="text-sm">Bu projeye atanmış alt yüklenici çalışanı bulunmuyor.</p>
           </CardContent>
         </Card>
       ) : (
@@ -444,14 +446,11 @@ function TaseronPuantajPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">#</TableHead>
-                  <TableHead className="w-32">Taşeron</TableHead>
+                  <TableHead className="w-32">Alt Yüklenici</TableHead>
                   <TableHead className="w-28">Ekip</TableHead>
                   <TableHead>Ad Soyad</TableHead>
                   <TableHead className="w-28">Görevi</TableHead>
-                  <TableHead className="w-28">Vardiya</TableHead>
-                  <TableHead className="w-32">Durum</TableHead>
-                  <TableHead className="w-24 text-center">Saat</TableHead>
-                  <TableHead className="w-24 text-center">Mesai</TableHead>
+                  <TableHead className="w-36">Durum</TableHead>
                   <TableHead className="w-44">Not</TableHead>
                 </TableRow>
               </TableHeader>
@@ -459,34 +458,40 @@ function TaseronPuantajPage() {
                 {paginatedGroupedWorkers.map((group) => (
                   <Fragment key={`group-${group.company}`}>
                     <TableRow className="bg-muted/50">
-                      <TableCell colSpan={10} className="py-1.5">
+                      <TableCell colSpan={7} className="py-1.5">
                         <span className="font-semibold text-sm">{group.company}</span>
                         <Badge variant="secondary" className="ml-2 text-xs">{group.workers.length} kişi</Badge>
+                        <Badge variant="default" className="ml-1 text-xs bg-green-600">
+                          {group.workers.filter((w) => editRows.get(w.id)?.status === "PRESENT").length} geldi
+                        </Badge>
                       </TableCell>
                     </TableRow>
                     {group.workers.map((w, idx) => {
                       const row = editRows.get(w.id);
                       if (!row) return null;
+                      const isNoRecord = !row.hasRecord && !row.isDirty;
+                      const rowBg = isNoRecord ? "bg-muted/20" : row.status === "PRESENT" ? "bg-green-50/50 dark:bg-green-950/10" : "";
                       return (
-                        <TableRow key={w.id}>
+                        <TableRow key={w.id} className={rowBg}>
                           <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
                           <TableCell className="text-xs">{w.team.company.name}</TableCell>
                           <TableCell className="text-xs">{w.team.name}</TableCell>
                           <TableCell className="font-medium text-sm">{w.firstName} {w.lastName}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{w.role}</TableCell>
                           <TableCell>
-                            <Select value={row.shift} onValueChange={(v) => changeShift(w.id, v as ShiftType)}>
-                              <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                            <Select value={isNoRecord ? "NO_RECORD" : row.status} onValueChange={(v) => changeStatus(w.id, v as AttendanceStatus)}>
+                              <SelectTrigger className={`h-8 w-36 ${isNoRecord ? "text-muted-foreground border-dashed" : ""}`}>
+                                <SelectValue />
+                              </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="DAY"><div className="flex items-center gap-1.5"><Sun className="h-3 w-3 text-yellow-500" /> Gündüz</div></SelectItem>
-                                <SelectItem value="NIGHT"><div className="flex items-center gap-1.5"><Moon className="h-3 w-3 text-blue-400" /> Gece</div></SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Select value={row.status} onValueChange={(v) => changeStatus(w.id, v as AttendanceStatus)}>
-                              <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
-                              <SelectContent position="popper" className="max-h-60">
+                                {isNoRecord && (
+                                  <SelectItem value="NO_RECORD" disabled>
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" />
+                                      Kayıt Yok
+                                    </div>
+                                  </SelectItem>
+                                )}
                                 {(Object.keys(STATUS_LABELS) as AttendanceStatus[]).map((s) => (
                                   <SelectItem key={s} value={s}>
                                     <div className="flex items-center gap-2">
@@ -497,16 +502,6 @@ function TaseronPuantajPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Input type="number" min={0} max={24} step={0.5} value={row.totalHours}
-                              onChange={(e) => updateRow(w.id, { totalHours: parseFloat(e.target.value) || 0 })}
-                              className="h-8 w-20 text-center mx-auto" />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Input type="number" min={0} max={12} step={0.5} value={row.overtime}
-                              onChange={(e) => updateRow(w.id, { overtime: parseFloat(e.target.value) || 0 })}
-                              className="h-8 w-20 text-center mx-auto" />
                           </TableCell>
                           <TableCell>
                             <textarea value={row.note} onChange={(e) => updateRow(w.id, { note: e.target.value })}

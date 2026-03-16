@@ -62,6 +62,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         emergencyName: body.emergencyName || null,
         emergencyPhone: body.emergencyPhone || null,
         emergencyRelation: body.emergencyRelation || null,
+        collarType: body.collarType || null,
         companyId: body.companyId || null,
         departmentId: body.departmentId || null,
         positionId: body.positionId || null,

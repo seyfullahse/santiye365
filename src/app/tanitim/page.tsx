@@ -70,10 +70,10 @@ export default function TanitimPage() {
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
         <div className="mx-auto max-w-6xl flex h-16 items-center justify-between px-4 sm:px-6">
           <Link href="/giris" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
-              <HardHat className="h-5 w-5" />
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg logo-ai-gradient logo-glow-ring logo-shimmer overflow-hidden">
+              <HardHat className="h-5 w-5 text-white logo-hat-float drop-shadow-sm" />
             </div>
-            <span className="text-lg font-bold tracking-tight">Şantiye360</span>
+            <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-violet-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">Şantiye360</span>
           </Link>
           <Link href="/giris">
             <Button size="sm" className="gap-1.5 font-medium">
@@ -132,8 +132,8 @@ export default function TanitimPage() {
         ══════════════════════════════════════════════ */}
         <section className="py-16 sm:py-20">
           <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 rounded-full bg-blue-400/10 border border-blue-400/20 text-blue-300 text-xs font-semibold px-4 py-1.5 mb-4">
-              <HardHat className="h-3.5 w-3.5" />
+            <div className="inline-flex items-center gap-2 rounded-full bg-violet-400/10 border border-violet-400/20 text-violet-300 text-xs font-semibold px-4 py-1.5 mb-4">
+              <HardHat className="h-3.5 w-3.5 logo-hat-float" />
               Uçtan Uca Yönetim
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold">
