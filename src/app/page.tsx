@@ -80,13 +80,21 @@ export default async function HomePage() {
 
     const employee = (userWithEmployee as any)?.employee ?? null;
 
-    // 2) Worker + attendance + leave (employee → worker bağlantısı gerekli)
+    // 2) Worker + attendance + leave
     let worker: any = null;
     let monthlyAttendance: any[] = [];
     let todayAtt: any = null;
     let leaveRequests: any[] = [];
 
     if (employee) {
+      // İzin taleplerini employee bazlı çek (leaveRequest tablosundan)
+      const leavePromise = (prisma as any).leaveRequest.findMany({
+        where: { employeeId: employee.id },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+
+      // Worker varsa puantaj verilerini çek
       worker = await (prisma as any).worker.findUnique({
         where: { employeeId: employee.id },
         select: { id: true },
@@ -94,7 +102,6 @@ export default async function HomePage() {
 
       if (worker) {
         const [attData, todayData, leavesData] = await Promise.all([
-          // Aylık puantaj
           (prisma as any).attendance.findMany({
             where: {
               workerId: worker.id,
@@ -102,23 +109,20 @@ export default async function HomePage() {
             },
             orderBy: { date: "asc" },
           }),
-          // Bugünkü puantaj
           (prisma as any).attendance.findFirst({
             where: {
               workerId: worker.id,
               date: { gte: startOfDay, lt: endOfDay },
             },
           }),
-          // İzin talepleri
-          (prisma as any).workerLeave.findMany({
-            where: { workerId: worker.id },
-            orderBy: { createdAt: "desc" },
-            take: 50,
-          }),
+          leavePromise,
         ]);
         monthlyAttendance = attData ?? [];
         todayAtt = todayData;
         leaveRequests = leavesData ?? [];
+      } else {
+        // Worker yoksa bile izin taleplerini göster
+        leaveRequests = (await leavePromise) ?? [];
       }
     }
 
@@ -127,7 +131,7 @@ export default async function HomePage() {
         userName={session.user?.name ?? "Kullanıcı"}
         userEmail={session.user?.email ?? ""}
         userRole={userRole}
-        workerId={worker?.id ?? null}
+        employeeId={employee?.id ?? null}
         employee={employee ? {
           id: employee.id,
           firstName: employee.firstName,

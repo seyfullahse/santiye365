@@ -97,7 +97,7 @@ export interface PortalProps {
   userEmail: string;
   userRole: string;
   employee: EmployeeInfo | null;
-  workerId: string | null;
+  employeeId: string | null;
   todayAttendance: AttendanceDay | null;
   monthlyAttendance: AttendanceDay[];
   leaveRequests: LeaveRequest[];
@@ -130,8 +130,9 @@ const ATT_STATUS: Record<string, { label: string; color: string; bg: string; ico
 };
 
 const LEAVE_TYPE: Record<string, string> = {
-  PAID_LEAVE: "Ücretli İzin", UNPAID_LEAVE: "Ücretsiz İzin", ANNUAL_LEAVE: "Yıllık İzin",
-  SICK_LEAVE: "Raporlu", MATERNITY: "Doğum İzni", OTHER: "Diğer",
+  ANNUAL: "Yıllık İzin", SICK: "Raporlu", MATERNITY: "Doğum İzni",
+  PATERNITY: "Babalık İzni", MARRIAGE: "Evlilik İzni", BEREAVEMENT: "Ölüm İzni",
+  UNPAID: "Ücretsiz İzin", COMPENSATION: "Telafi İzni", OTHER_LEAVE: "Diğer",
 };
 
 const LEAVE_STATUS: Record<string, { label: string; color: string }> = {
@@ -488,17 +489,17 @@ function AttendancePage({ attendance }: { attendance: AttendanceDay[] }) {
 /* ═══════════════════════════════════════════════════════════
    SAYFA: İZİN TALEPLERİ
 ═══════════════════════════════════════════════════════════ */
-function LeavePage({ leaves, workerId }: { leaves: LeaveRequest[]; workerId: string | null }) {
+function LeavePage({ leaves, employeeId }: { leaves: LeaveRequest[]; employeeId: string | null }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLeave, setEditingLeave] = useState<LeaveRequest | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [form, setForm] = useState({ type: "ANNUAL_LEAVE", startDate: "", endDate: "", reason: "" });
+  const [form, setForm] = useState({ type: "ANNUAL", startDate: "", endDate: "", reason: "" });
   const [localLeaves, setLocalLeaves] = useState(leaves);
 
   const openNewDialog = () => {
     setEditingLeave(null);
-    setForm({ type: "ANNUAL_LEAVE", startDate: "", endDate: "", reason: "" });
+    setForm({ type: "ANNUAL", startDate: "", endDate: "", reason: "" });
     setDialogOpen(true);
   };
 
@@ -510,14 +511,14 @@ function LeavePage({ leaves, workerId }: { leaves: LeaveRequest[]; workerId: str
 
   const handleSubmit = async () => {
     if (!form.startDate || !form.endDate) { toast.error("Başlangıç ve bitiş tarihi zorunludur"); return; }
-    if (!workerId) { toast.error("İK kaydınız bulunamadı. Yöneticinizle iletişime geçin."); return; }
+    if (!employeeId) { toast.error("İK kaydınız bulunamadı. Yöneticinizle iletişime geçin."); return; }
     setSaving(true);
     try {
       const isEdit = !!editingLeave;
       const res = await fetch("/api/portal/izin-talebi", {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isEdit ? { leaveId: editingLeave!.id, ...form } : { workerId, ...form }),
+        body: JSON.stringify(isEdit ? { leaveId: editingLeave!.id, ...form } : { employeeId, ...form }),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || "İşlem başarısız"); return; }
@@ -530,7 +531,7 @@ function LeavePage({ leaves, workerId }: { leaves: LeaveRequest[]; workerId: str
       }
       setDialogOpen(false);
       setEditingLeave(null);
-      setForm({ type: "ANNUAL_LEAVE", startDate: "", endDate: "", reason: "" });
+      setForm({ type: "ANNUAL", startDate: "", endDate: "", reason: "" });
     } catch { toast.error("Bir hata oluştu"); } finally { setSaving(false); }
   };
 
@@ -558,12 +559,12 @@ function LeavePage({ leaves, workerId }: { leaves: LeaveRequest[]; workerId: str
           <h2 className="text-lg font-semibold">İzin Taleplerim</h2>
           {statusFilter.pending > 0 && <Badge className="bg-amber-500">{statusFilter.pending} beklemede</Badge>}
         </div>
-        <Button size="sm" onClick={openNewDialog} disabled={!workerId} className="gap-1.5">
+        <Button size="sm" onClick={openNewDialog} disabled={!employeeId} className="gap-1.5">
           <Plus className="h-3.5 w-3.5" /> Yeni Talep
         </Button>
       </div>
 
-      {!workerId && (
+      {!employeeId && (
         <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
           <CardContent className="py-3 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
             <Info className="h-4 w-4 flex-shrink-0" />
@@ -876,7 +877,7 @@ function PortalContent(props: PortalProps) {
   const h = now.getHours();
   const greeting = h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar";
 
-  const workerId = props.workerId;
+  const employeeId = props.employeeId;
 
   const pendingLeaves = leaveRequests.filter(l => l.status === "PENDING").length;
   const unreadAnn = announcements.filter(a => !a.isRead).length;
@@ -1062,7 +1063,7 @@ function PortalContent(props: PortalProps) {
           {/* Page Content */}
           {currentPage === "overview" && <OverviewPage props={props} navigate={navigate} />}
           {currentPage === "attendance" && <AttendancePage attendance={props.monthlyAttendance} />}
-          {currentPage === "leave" && <LeavePage leaves={props.leaveRequests} workerId={workerId} />}
+          {currentPage === "leave" && <LeavePage leaves={props.leaveRequests} employeeId={employeeId} />}
           {currentPage === "discounts" && <DiscountsPage discounts={props.discounts} />}
           {currentPage === "announcements" && <AnnouncementsPage announcements={props.announcements} />}
           {currentPage === "profile" && <ProfilePage employee={employee} userName={userName} userEmail={props.userEmail} userRole={userRole} projectInfo={props.projectInfo} />}

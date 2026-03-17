@@ -10,34 +10,25 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { workerId, type, startDate, endDate, reason } = body;
+    const { employeeId, type, startDate, endDate, reason } = body;
 
-    if (!workerId || !type || !startDate || !endDate) {
+    if (!employeeId || !type || !startDate || !endDate) {
       return NextResponse.json({ error: "Zorunlu alanlar eksik" }, { status: 400 });
     }
 
-    // Geçerli izin türleri
-    const validTypes = ["PAID_LEAVE", "UNPAID_LEAVE", "ANNUAL_LEAVE", "SICK_LEAVE", "MATERNITY", "OTHER"];
+    // Geçerli izin türleri (LeaveType enum)
+    const validTypes = ["ANNUAL", "SICK", "MATERNITY", "PATERNITY", "MARRIAGE", "BEREAVEMENT", "UNPAID", "COMPENSATION", "OTHER_LEAVE"];
     if (!validTypes.includes(type)) {
       return NextResponse.json({ error: "Geçersiz izin türü" }, { status: 400 });
     }
 
-    // Worker'ın bu kullanıcıya ait olduğunu doğrula (güvenlik)
+    // Employee'nin bu kullanıcıya ait olduğunu doğrula (güvenlik)
     const user = await (prisma as any).user.findUnique({
       where: { id: session.user.id },
       select: { employeeId: true },
     });
 
-    if (!user?.employeeId) {
-      return NextResponse.json({ error: "İK kaydınız bulunamadı" }, { status: 400 });
-    }
-
-    const worker = await (prisma as any).worker.findUnique({
-      where: { employeeId: user.employeeId },
-      select: { id: true },
-    });
-
-    if (!worker || worker.id !== workerId) {
+    if (!user?.employeeId || user.employeeId !== employeeId) {
       return NextResponse.json({ error: "Bu işlem için yetkiniz yok" }, { status: 403 });
     }
 
@@ -50,10 +41,10 @@ export async function POST(request: Request) {
     const diffMs = end.getTime() - start.getTime();
     const totalDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
 
-    // Çakışma kontrolü
-    const overlap = await (prisma as any).workerLeave.findFirst({
+    // Çakışma kontrolü (leaveRequest tablosunda)
+    const overlap = await (prisma as any).leaveRequest.findFirst({
       where: {
-        workerId,
+        employeeId,
         status: { in: ["PENDING", "APPROVED"] },
         OR: [
           { startDate: { lte: end }, endDate: { gte: start } },
@@ -68,10 +59,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // İzin talebi oluştur
-    const leave = await (prisma as any).workerLeave.create({
+    // İzin talebi oluştur (leaveRequest tablosuna)
+    const leave = await (prisma as any).leaveRequest.create({
       data: {
-        workerId,
+        employeeId,
         type,
         startDate: start,
         endDate: end,
@@ -114,12 +105,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Zorunlu alanlar eksik" }, { status: 400 });
     }
 
-    const validTypes = ["PAID_LEAVE", "UNPAID_LEAVE", "ANNUAL_LEAVE", "SICK_LEAVE", "MATERNITY", "OTHER"];
+    const validTypes = ["ANNUAL", "SICK", "MATERNITY", "PATERNITY", "MARRIAGE", "BEREAVEMENT", "UNPAID", "COMPENSATION", "OTHER_LEAVE"];
     if (!validTypes.includes(type)) {
       return NextResponse.json({ error: "Geçersiz izin türü" }, { status: 400 });
     }
 
-    // Sahiplik doğrulama: User → Employee → Worker → Leave
+    // Sahiplik doğrulama: User → Employee
     const user = await (prisma as any).user.findUnique({
       where: { id: session.user.id },
       select: { employeeId: true },
@@ -127,18 +118,11 @@ export async function PUT(request: Request) {
     if (!user?.employeeId) {
       return NextResponse.json({ error: "İK kaydınız bulunamadı" }, { status: 400 });
     }
-    const worker = await (prisma as any).worker.findUnique({
-      where: { employeeId: user.employeeId },
-      select: { id: true },
-    });
-    if (!worker) {
-      return NextResponse.json({ error: "Worker kaydı bulunamadı" }, { status: 400 });
-    }
 
     // Talebi bul ve sahibi kontrol et
-    const existing = await (prisma as any).workerLeave.findUnique({ where: { id: leaveId } });
+    const existing = await (prisma as any).leaveRequest.findUnique({ where: { id: leaveId } });
     if (!existing) return NextResponse.json({ error: "Talep bulunamadı" }, { status: 404 });
-    if (existing.workerId !== worker.id) return NextResponse.json({ error: "Bu işlem için yetkiniz yok" }, { status: 403 });
+    if (existing.employeeId !== user.employeeId) return NextResponse.json({ error: "Bu işlem için yetkiniz yok" }, { status: 403 });
     if (existing.status !== "PENDING") return NextResponse.json({ error: "Sadece beklemedeki talepler düzenlenebilir" }, { status: 400 });
 
     const start = new Date(startDate);
@@ -147,9 +131,9 @@ export async function PUT(request: Request) {
     const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     // Çakışma kontrolü (kendi talebi hariç)
-    const overlap = await (prisma as any).workerLeave.findFirst({
+    const overlap = await (prisma as any).leaveRequest.findFirst({
       where: {
-        workerId: worker.id,
+        employeeId: user.employeeId,
         id: { not: leaveId },
         status: { in: ["PENDING", "APPROVED"] },
         OR: [{ startDate: { lte: end }, endDate: { gte: start } }],
@@ -157,7 +141,7 @@ export async function PUT(request: Request) {
     });
     if (overlap) return NextResponse.json({ error: "Bu tarih aralığında zaten bir izin talebi mevcut" }, { status: 409 });
 
-    const leave = await (prisma as any).workerLeave.update({
+    const leave = await (prisma as any).leaveRequest.update({
       where: { id: leaveId },
       data: { type, startDate: start, endDate: end, totalDays, reason: reason || null },
     });
@@ -195,18 +179,12 @@ export async function DELETE(request: Request) {
     });
     if (!user?.employeeId) return NextResponse.json({ error: "İK kaydınız bulunamadı" }, { status: 400 });
 
-    const worker = await (prisma as any).worker.findUnique({
-      where: { employeeId: user.employeeId },
-      select: { id: true },
-    });
-    if (!worker) return NextResponse.json({ error: "Worker kaydı bulunamadı" }, { status: 400 });
-
-    const existing = await (prisma as any).workerLeave.findUnique({ where: { id: leaveId } });
+    const existing = await (prisma as any).leaveRequest.findUnique({ where: { id: leaveId } });
     if (!existing) return NextResponse.json({ error: "Talep bulunamadı" }, { status: 404 });
-    if (existing.workerId !== worker.id) return NextResponse.json({ error: "Bu işlem için yetkiniz yok" }, { status: 403 });
+    if (existing.employeeId !== user.employeeId) return NextResponse.json({ error: "Bu işlem için yetkiniz yok" }, { status: 403 });
     if (existing.status !== "PENDING") return NextResponse.json({ error: "Sadece beklemedeki talepler silinebilir" }, { status: 400 });
 
-    await (prisma as any).workerLeave.delete({ where: { id: leaveId } });
+    await (prisma as any).leaveRequest.delete({ where: { id: leaveId } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
