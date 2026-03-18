@@ -41,6 +41,7 @@ export async function GET() {
       foundedYear: profile.foundedYear,
       logoUrl: profile.logoUrl,
       description: profile.description,
+      emailDomain: profile.emailDomain || "santiye360.com",
       // Meta
       _count: mainCompany._count,
       createdAt: mainCompany.createdAt,
@@ -97,6 +98,7 @@ export async function PUT(req: NextRequest) {
         foundedYear: body.foundedYear ? parseInt(body.foundedYear) : null,
         logoUrl: body.logoUrl ?? null,
         description: body.description ?? null,
+        emailDomain: body.emailDomain !== undefined ? (body.emailDomain || "santiye360.com") : undefined,
       },
     });
 
@@ -117,6 +119,7 @@ export async function PUT(req: NextRequest) {
       foundedYear: updatedProfile.foundedYear,
       logoUrl: updatedProfile.logoUrl,
       description: updatedProfile.description,
+      emailDomain: updatedProfile.emailDomain || "santiye360.com",
     });
   } catch (error) {
     console.error("PUT /api/organizasyon/profil error:", error);

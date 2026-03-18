@@ -72,6 +72,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState, useMemo } from "react";
 import { checkPermissionSync } from "@/lib/permissions-shared";
 import { NotificationBell } from "@/components/notification-bell";
+import { SidebarISGSummary } from "@/components/sidebar-isg-summary";
 
 /* ─────── Yardımcı: Proje ID'sini pathname'den çıkar ─────── */
 function extractProjectId(pathname: string): string | null {
@@ -142,6 +143,7 @@ function getProjectScopedNav(projectId: string) {
 const ikNavigation = [
   { name: "İK Özet", href: "/ik", icon: BarChart3 },
   { name: "Personel", href: "/ik/personel", icon: UserPlus },
+  { name: "Hesap Oluştur", href: "/ik/hesap-olustur", icon: Users },
   { name: "Departmanlar", href: "/ik/departmanlar", icon: Building2 },
   { name: "Pozisyonlar", href: "/ik/pozisyonlar", icon: Briefcase },
   { name: "İzin Yönetimi", href: "/ik/izinler", icon: CalendarDays },
@@ -153,6 +155,7 @@ const ikNavigation = [
 /* ─────── İSG Navigasyonu ─────── */
 const isgNavigation = [
   { name: "İSG Özet", href: "/isg", icon: Shield },
+  { name: "Personel İSG", href: "/isg/personel-durum", icon: Users },
   { name: "Eğitimler", href: "/isg/egitimler", icon: GraduationCap },
   { name: "Sertifikalar", href: "/isg/sertifikalar", icon: Award },
   { name: "Periyodik Muayene", href: "/isg/muayeneler", icon: Stethoscope },
@@ -518,9 +521,30 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <Separator />
 
-      {/* User */}
-      <div className="p-4 space-y-4">
-        <div className="flex items-center gap-3">
+      {/* ISG Durumum + Profil */}
+      <div className="p-3 space-y-2">
+        {/* ISG Özet */}
+        <SidebarISGSummary />
+
+        {/* İSG Bilgilerim Butonu */}
+        <Link
+          href="/isg/benim"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors w-full",
+            pathname === "/isg/benim"
+              ? "bg-red-600 text-white"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+          )}
+        >
+          <Shield className="h-4 w-4" />
+          İSG Bilgilerim
+        </Link>
+
+        <Separator />
+
+        {/* User */}
+        <div className="flex items-center gap-3 pt-1">
           <Avatar className="h-9 w-9">
             <AvatarFallback>
               {session?.user?.name?.charAt(0) ?? "U"}

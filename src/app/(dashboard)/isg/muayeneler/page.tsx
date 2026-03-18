@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Stethoscope } from "lucide-react";
+import { Plus, Stethoscope, Search } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface Exam {
   id: string; examType: string; examDate: string; result: string; nextExamDate: string | null; notes: string | null;
@@ -34,6 +35,9 @@ export default function MuayenelerPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [form, setForm] = useState({ employeeId: "", examType: "PERIODIC", examDate: "", result: "PENDING_EXAM", nextExamDate: "", notes: "" });
 
   const fetchData = async () => {
@@ -57,6 +61,21 @@ export default function MuayenelerPage() {
   };
 
   const setField = (f: string, v: string) => setForm((p) => ({ ...p, [f]: v }));
+
+  const filteredExams = useMemo(() => {
+    if (!search) return exams;
+    const s = search.toLowerCase();
+    return exams.filter((e) =>
+      `${e.employee.firstName} ${e.employee.lastName} ${examTypeMap[e.examType] || ""}`.toLowerCase().includes(s)
+    );
+  }, [exams, search]);
+
+  useEffect(() => { setCurrentPage(1); }, [search]);
+
+  const paginatedExams = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredExams.slice(start, start + pageSize);
+  }, [filteredExams, currentPage, pageSize]);
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -101,14 +120,22 @@ export default function MuayenelerPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Arama */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Personel ara..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
       <Card>
         <CardHeader><CardTitle>Muayene Kayıtları</CardTitle></CardHeader>
         <CardContent>
-          {loading ? <div className="text-center py-8 text-muted-foreground">Yükleniyor...</div> : exams.length === 0 ? <div className="text-center py-8 text-muted-foreground">Muayene kaydı yok</div> : (
+          {loading ? <div className="text-center py-8 text-muted-foreground">Yükleniyor...</div> : filteredExams.length === 0 ? <div className="text-center py-8 text-muted-foreground">{exams.length === 0 ? "Muayene kaydı yok" : "Aramanızla eşleşen kayıt bulunamadı"}</div> : (
+            <>
             <Table>
               <TableHeader><TableRow><TableHead>Personel</TableHead><TableHead>Tür</TableHead><TableHead>Tarih</TableHead><TableHead>Sonuç</TableHead><TableHead>Sonraki Muayene</TableHead><TableHead>Not</TableHead></TableRow></TableHeader>
               <TableBody>
-                {exams.map((e) => (
+                {paginatedExams.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{e.employee.firstName} {e.employee.lastName}</TableCell>
                     <TableCell>{examTypeMap[e.examType] || e.examType}</TableCell>
@@ -120,6 +147,15 @@ export default function MuayenelerPage() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              totalItems={filteredExams.length}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemLabel="muayene"
+            />
+            </>
           )}
         </CardContent>
       </Card>

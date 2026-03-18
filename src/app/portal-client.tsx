@@ -2,13 +2,13 @@
 "use client";
 
 import { SessionProvider, signOut } from "next-auth/react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   HardHat, Bell, LogOut, User, Building2, Briefcase, MapPin, Phone, Mail,
   Clock, CheckCircle2, XCircle, AlertTriangle, Pin, Megaphone,
   Tag, Calendar, Send, Plus, CircleDot,
   Percent, Info, ClipboardList, Home, Pencil, Trash2, ChevronLeft,
-  Menu, X,
+  Menu, X, ShieldCheck, BookOpen, HardHat as HelmetIcon, Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,28 @@ interface NotificationItem {
   createdAt: string;
 }
 
+interface ISGData {
+  linked: boolean;
+  message?: string;
+  employee?: { firstName: string; lastName: string; collarType: string | null; department: string | null; position: string | null };
+  complianceScore?: number;
+  trainings?: {
+    completedCount: number;
+    plannedCount: number;
+    expiredCount: number;
+    missingMandatoryCount: number;
+    mandatoryTotal: number;
+    missingMandatory: { id: string; name: string; category: string }[];
+    expiring: { name: string; expiryDate: string }[];
+  };
+  ppe?: {
+    activeCount: number;
+    expiredCount: number;
+    expiringCount: number;
+    items: { name: string; category: string | null; expiryDate: string | null; isExpired: boolean }[];
+  };
+}
+
 export interface PortalProps {
   userName: string;
   userEmail: string;
@@ -107,7 +129,7 @@ export interface PortalProps {
   projectInfo: { id: string; name: string; client: string | null; status: string } | null;
 }
 
-type PortalPage = "overview" | "attendance" | "leave" | "discounts" | "announcements" | "profile";
+type PortalPage = "overview" | "attendance" | "leave" | "discounts" | "announcements" | "profile" | "isg";
 
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
@@ -152,6 +174,7 @@ const NAV_ITEMS: { key: PortalPage; label: string; icon: React.ElementType }[] =
   { key: "overview",      label: "Genel Bakış",    icon: Home },
   { key: "attendance",    label: "Puantajım",      icon: ClipboardList },
   { key: "leave",         label: "İzin Talepleri",  icon: Calendar },
+  { key: "isg",           label: "İSG Bilgilerim", icon: ShieldCheck },
   { key: "discounts",     label: "İndirimler",     icon: Tag },
   { key: "announcements", label: "Duyurular",      icon: Megaphone },
   { key: "profile",       label: "Profilim",       icon: User },
@@ -185,6 +208,12 @@ function OverviewPage({ props, navigate }: { props: PortalProps; navigate: (p: P
   }, [monthlyAttendance]);
 
   const pendingLeaves = leaveRequests.filter(l => l.status === "PENDING").length;
+
+  // ISG verilerini çek
+  const [isgData, setIsgData] = useState<ISGData | null>(null);
+  useEffect(() => {
+    fetch("/api/isg/benim").then(r => r.json()).then(d => setIsgData(d)).catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -317,6 +346,81 @@ function OverviewPage({ props, navigate }: { props: PortalProps; navigate: (p: P
           </CardContent>
         </Card>
       </div>
+
+      {/* İSG Uyum Özeti */}
+      {isgData?.linked && (
+        <Card className="cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("isg")}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" /> İSG Durumum
+              {(isgData.trainings?.missingMandatoryCount ?? 0) > 0 && (
+                <Badge className="bg-red-500 text-[10px] ml-auto">{isgData.trainings?.missingMandatoryCount} eksik</Badge>
+              )}
+              {(isgData.trainings?.missingMandatoryCount ?? 0) === 0 && isgData.complianceScore === 100 && (
+                <Badge className="bg-emerald-500 text-[10px] ml-auto">Tam Uyumlu</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {/* Uyum skoru çubuğu */}
+              <div className="flex items-center gap-3">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                  (isgData.complianceScore ?? 0) >= 80 ? "bg-emerald-100 dark:bg-emerald-950" : (isgData.complianceScore ?? 0) >= 50 ? "bg-amber-100 dark:bg-amber-950" : "bg-red-100 dark:bg-red-950"
+                }`}>
+                  <span className={`text-lg font-bold ${
+                    (isgData.complianceScore ?? 0) >= 80 ? "text-emerald-600" : (isgData.complianceScore ?? 0) >= 50 ? "text-amber-600" : "text-red-600"
+                  }`}>%{isgData.complianceScore ?? 0}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <span>Uyum Skoru</span>
+                    <span>{(isgData.trainings?.mandatoryTotal ?? 0) - (isgData.trainings?.missingMandatoryCount ?? 0)}/{isgData.trainings?.mandatoryTotal ?? 0}</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-500 ${
+                      (isgData.complianceScore ?? 0) >= 80 ? "bg-emerald-500" : (isgData.complianceScore ?? 0) >= 50 ? "bg-amber-500" : "bg-red-500"
+                    }`} style={{ width: `${isgData.complianceScore ?? 0}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Özet satırlar */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+                  <p className="text-lg font-bold text-emerald-600">{isgData.trainings?.completedCount ?? 0}</p>
+                  <p className="text-[10px] text-muted-foreground">Eğitim</p>
+                </div>
+                <div className="p-2 rounded-lg bg-red-50 dark:bg-red-950/30">
+                  <p className="text-lg font-bold text-red-600">{isgData.trainings?.missingMandatoryCount ?? 0}</p>
+                  <p className="text-[10px] text-muted-foreground">Eksik</p>
+                </div>
+                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                  <p className="text-lg font-bold text-blue-600">{isgData.ppe?.activeCount ?? 0}</p>
+                  <p className="text-[10px] text-muted-foreground">KKD</p>
+                </div>
+              </div>
+
+              {/* Eksik eğitimler (max 2 göster) */}
+              {isgData.trainings && isgData.trainings.missingMandatory.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-xs font-medium text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Eksik zorunlu eğitimler:
+                  </p>
+                  {isgData.trainings.missingMandatory.slice(0, 2).map(m => (
+                    <div key={m.id} className="text-xs text-red-600/80 dark:text-red-400/80 pl-4 flex items-center gap-1.5">
+                      <XCircle className="h-3 w-3 flex-shrink-0" /> {m.name}
+                    </div>
+                  ))}
+                  {isgData.trainings.missingMandatory.length > 2 && (
+                    <p className="text-xs text-primary font-medium pl-4">+{isgData.trainings.missingMandatory.length - 2} daha fazla →</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Son duyurular */}
       {announcements.length > 0 && (
@@ -866,6 +970,255 @@ function ProfilePage({ employee, userName, userEmail, userRole, projectInfo }: {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   SAYFA: İSG BİLGİLERİM
+═══════════════════════════════════════════════════════════ */
+function ISGPage() {
+  const [data, setData] = useState<ISGData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/isg/benim")
+      .then(r => r.json())
+      .then(d => setData(d))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!data || !data.linked) {
+    return (
+      <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+        <CardContent className="py-6 flex items-center gap-3 text-sm text-amber-700 dark:text-amber-400">
+          <Info className="h-5 w-5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">İSG bilgileriniz görüntülenemiyor</p>
+            <p className="text-xs mt-0.5">Çalışan kaydınız henüz sisteme bağlanmamış. Yöneticinize başvurun.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { complianceScore = 0, trainings, ppe } = data;
+  const scoreColor = complianceScore >= 80 ? "text-emerald-600" : complianceScore >= 50 ? "text-amber-600" : "text-red-600";
+  const scoreBg = complianceScore >= 80 ? "bg-emerald-500" : complianceScore >= 50 ? "bg-amber-500" : "bg-red-500";
+
+  return (
+    <div className="space-y-5">
+      {/* KPI kartları */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${complianceScore >= 80 ? "bg-emerald-100 dark:bg-emerald-950" : complianceScore >= 50 ? "bg-amber-100 dark:bg-amber-950" : "bg-red-100 dark:bg-red-950"}`}>
+                <ShieldCheck className={`h-5 w-5 ${scoreColor}`} />
+              </div>
+              <div>
+                <p className={`text-2xl font-bold ${scoreColor}`}>%{complianceScore}</p>
+                <p className="text-[11px] text-muted-foreground leading-tight">Uyum Skoru</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950">
+                <BookOpen className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{trainings?.completedCount ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground leading-tight">Tamamlanan Eğitim</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 dark:bg-red-950">
+                <XCircle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-red-600">{trainings?.missingMandatoryCount ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground leading-tight">Eksik Eğitim</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-950">
+                <HelmetIcon className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{ppe?.activeCount ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground leading-tight">Aktif KKD</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Uyum skoru çubuğu */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" /> İSG Uyum Durumu
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Zorunlu eğitim tamamlanma oranı</span>
+              <span className={`font-bold ${scoreColor}`}>%{complianceScore}</span>
+            </div>
+            <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-500 ${scoreBg}`} style={{ width: `${complianceScore}%` }} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {trainings?.mandatoryTotal ?? 0} zorunlu eğitimden {(trainings?.mandatoryTotal ?? 0) - (trainings?.missingMandatoryCount ?? 0)} tanesi tamamlandı
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Eksik zorunlu eğitimler */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" /> Eksik Zorunlu Eğitimler
+              {(trainings?.missingMandatoryCount ?? 0) > 0 && (
+                <Badge className="bg-red-500 text-[10px] ml-auto">{trainings?.missingMandatoryCount}</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {trainings && trainings.missingMandatory.length > 0 ? (
+              <div className="space-y-2">
+                {trainings.missingMandatory.map(m => (
+                  <div key={m.id} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-800">
+                    <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-red-700 dark:text-red-400 truncate">{m.name}</p>
+                      <p className="text-[11px] text-red-600/70 dark:text-red-400/60">{m.category}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center">
+                <CheckCircle2 className="h-9 w-9 mx-auto text-emerald-500/40 mb-2" />
+                <p className="text-sm text-muted-foreground">Tüm zorunlu eğitimler tamamlandı</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* KKD Durumu */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <HelmetIcon className="h-4 w-4 text-blue-500" /> KKD Zimmetlerim
+              {(ppe?.expiredCount ?? 0) > 0 && (
+                <Badge className="bg-red-500 text-[10px] ml-auto">{ppe?.expiredCount} süresi dolmuş</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ppe && ppe.items.length > 0 ? (
+              <div className="space-y-2">
+                {ppe.items.map((item, i) => (
+                  <div key={i} className={`flex items-center justify-between p-2.5 rounded-lg border ${item.isExpired ? "border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-800" : "border-border"}`}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <HelmetIcon className={`h-4 w-4 flex-shrink-0 ${item.isExpired ? "text-red-500" : "text-blue-500"}`} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{item.name}</p>
+                        {item.category && <p className="text-[11px] text-muted-foreground">{item.category}</p>}
+                      </div>
+                    </div>
+                    {item.expiryDate && (
+                      <Badge variant="outline" className={`text-[10px] flex-shrink-0 ${item.isExpired ? "border-red-300 text-red-600 dark:text-red-400" : ""}`}>
+                        {item.isExpired ? "Süresi dolmuş" : new Date(item.expiryDate).toLocaleDateString("tr-TR")}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center">
+                <HelmetIcon className="h-9 w-9 mx-auto text-muted-foreground/30 mb-2" />
+                <p className="text-sm text-muted-foreground">KKD zimmet kaydı bulunamadı</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Yaklaşan süreler */}
+      {trainings && trainings.expiring.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-500" /> Süresi Yaklaşan Eğitimler
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {trainings.expiring.map((t, i) => (
+                <div key={i} className="flex items-center justify-between p-2.5 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
+                  <div className="flex items-center gap-2.5">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{t.name}</p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-600 dark:text-amber-400">
+                    {new Date(t.expiryDate).toLocaleDateString("tr-TR")}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Eğitim Özeti */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-primary" /> Eğitim Özeti
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+              <p className="text-xl font-bold text-emerald-600">{trainings?.completedCount ?? 0}</p>
+              <p className="text-[11px] text-muted-foreground">Tamamlandı</p>
+            </div>
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+              <p className="text-xl font-bold text-blue-600">{trainings?.plannedCount ?? 0}</p>
+              <p className="text-[11px] text-muted-foreground">Planlandı</p>
+            </div>
+            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30">
+              <p className="text-xl font-bold text-red-600">{trainings?.expiredCount ?? 0}</p>
+              <p className="text-[11px] text-muted-foreground">Süresi Dolmuş</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
    PORTAL LAYOUT — Sidebar + Content
 ═══════════════════════════════════════════════════════════ */
 function PortalContent(props: PortalProps) {
@@ -892,6 +1245,7 @@ function PortalContent(props: PortalProps) {
     overview: "Genel Bakış",
     attendance: "Puantajım",
     leave: "İzin Talepleri",
+    isg: "İSG Bilgilerim",
     discounts: "İndirimler",
     announcements: "Duyurular",
     profile: "Profilim",
@@ -1064,6 +1418,7 @@ function PortalContent(props: PortalProps) {
           {currentPage === "overview" && <OverviewPage props={props} navigate={navigate} />}
           {currentPage === "attendance" && <AttendancePage attendance={props.monthlyAttendance} />}
           {currentPage === "leave" && <LeavePage leaves={props.leaveRequests} employeeId={employeeId} />}
+          {currentPage === "isg" && <ISGPage />}
           {currentPage === "discounts" && <DiscountsPage discounts={props.discounts} />}
           {currentPage === "announcements" && <AnnouncementsPage announcements={props.announcements} />}
           {currentPage === "profile" && <ProfilePage employee={employee} userName={userName} userEmail={props.userEmail} userRole={userRole} projectInfo={props.projectInfo} />}

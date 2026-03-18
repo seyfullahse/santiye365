@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Award } from "lucide-react";
+import { Plus, Award, Search } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface Certificate {
   id: string; name: string; issuedBy: string; issueDate: string; expiryDate: string | null; status: string;
@@ -28,6 +29,9 @@ export default function SertifikalarPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [form, setForm] = useState({ employeeId: "", name: "", issuedBy: "", issueDate: "", expiryDate: "", status: "VALID" });
 
   const fetchData = async () => {
@@ -59,6 +63,21 @@ export default function SertifikalarPage() {
     if (days === 0) return "Bugün";
     return `${days} gün`;
   };
+
+  const filteredCerts = useMemo(() => {
+    if (!search) return certs;
+    const s = search.toLowerCase();
+    return certs.filter((c) =>
+      `${c.employee.firstName} ${c.employee.lastName} ${c.name} ${c.issuedBy}`.toLowerCase().includes(s)
+    );
+  }, [certs, search]);
+
+  useEffect(() => { setCurrentPage(1); }, [search]);
+
+  const paginatedCerts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredCerts.slice(start, start + pageSize);
+  }, [filteredCerts, currentPage, pageSize]);
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -98,14 +117,22 @@ export default function SertifikalarPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Arama */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Personel veya sertifika ara..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
       <Card>
         <CardHeader><CardTitle>Sertifika Listesi</CardTitle></CardHeader>
         <CardContent>
-          {loading ? <div className="text-center py-8 text-muted-foreground">Yükleniyor...</div> : certs.length === 0 ? <div className="text-center py-8 text-muted-foreground">Sertifika kaydı yok</div> : (
+          {loading ? <div className="text-center py-8 text-muted-foreground">Yükleniyor...</div> : filteredCerts.length === 0 ? <div className="text-center py-8 text-muted-foreground">{certs.length === 0 ? "Sertifika kaydı yok" : "Aramanızla eşleşen sertifika bulunamadı"}</div> : (
+            <>
             <Table>
               <TableHeader><TableRow><TableHead>Personel</TableHead><TableHead>Sertifika</TableHead><TableHead>Veren Kurum</TableHead><TableHead>Durum</TableHead><TableHead>Son Geçerlilik</TableHead><TableHead>Kalan</TableHead></TableRow></TableHeader>
               <TableBody>
-                {certs.map((c) => (
+                {paginatedCerts.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.employee.firstName} {c.employee.lastName}</TableCell>
                     <TableCell>{c.name}</TableCell>
@@ -117,6 +144,15 @@ export default function SertifikalarPage() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              totalItems={filteredCerts.length}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemLabel="sertifika"
+            />
+            </>
           )}
         </CardContent>
       </Card>

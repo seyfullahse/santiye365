@@ -28,6 +28,7 @@ interface CompanyProfile {
   foundedYear: number | null;
   logoUrl: string | null;
   description: string | null;
+  emailDomain: string | null;
 }
 
 interface Team {
@@ -46,7 +47,7 @@ interface Discipline { id: string; name: string }
 /* ───────── constants ───────── */
 const emptyForm = {
   name: "", taxNo: "", taxOffice: "", address: "", phone: "", email: "",
-  website: "", sector: "", foundedYear: "", logoUrl: "", description: "",
+  website: "", sector: "", foundedYear: "", logoUrl: "", description: "", emailDomain: "santiye360.com",
 };
 
 const emptyTeamForm = { name: "", disciplineId: "", sortOrder: "0" };
@@ -84,6 +85,7 @@ export default function FirmaProfilPage() {
           foundedYear: data.foundedYear?.toString() || "",
           logoUrl: data.logoUrl || "",
           description: data.description || "",
+          emailDomain: data.emailDomain || "santiye360.com",
         });
         setLoading(false);
       })
@@ -233,6 +235,11 @@ export default function FirmaProfilPage() {
                 <div>
                   <Label>Logo URL</Label>
                   <Input value={form.logoUrl} onChange={(e) => setField("logoUrl", e.target.value)} placeholder="https://..." />
+                </div>
+                <div>
+                  <Label>E-posta Alan Adı (Domain)</Label>
+                  <Input value={form.emailDomain} onChange={(e) => setField("emailDomain", e.target.value)} placeholder="santiye360.com" />
+                  <p className="text-xs text-muted-foreground mt-1">Kullanıcı hesapları için varsayılan e-posta domain’i: <strong>ad.soyad@{form.emailDomain || "santiye360.com"}</strong></p>
                 </div>
               </div>
               <div>

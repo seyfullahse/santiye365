@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Pencil, Trash2, Download, Upload, FileDown } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download, Upload, FileDown, Users } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface Employee {
   id: string;
@@ -429,6 +430,11 @@ export default function PersonelPage() {
             <Download className="h-4 w-4 mr-2" />CSV Dışa Aktar
           </Button>
           <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+          <Link href="/ik/hesap-olustur">
+            <Button size="sm" variant="outline">
+              <Users className="h-4 w-4 mr-2" />Hesap Oluştur
+            </Button>
+          </Link>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Yeni Personel</Button>

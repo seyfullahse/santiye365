@@ -1112,8 +1112,33 @@ model TrainingDefinition {
   createdAt       DateTime         @default(now()) @map("created_at")
 
   trainings       EmployeeTraining[]
+  requirements    TrainingRequirement[]
 
   @@map("training_definitions")
+}
+
+// ─── EĞİTİM GEREKSİNİMLERİ (Hedef Kitle) ───────────────
+// Bir eğitimin kim için zorunlu olduğunu tanımlar
+// Bir eğitimin birden fazla hedef kitlesi olabilir
+model TrainingRequirement {
+  id                   String              @id @default(cuid())
+  trainingDefinitionId String              @map("training_definition_id")
+  targetType           TrainingTargetType  @map("target_type")
+  targetValue          String?             @map("target_value") // null=TÜM, "WHITE"/"BLUE", departmentId, positionId, employeeId
+  createdAt            DateTime            @default(now()) @map("created_at")
+
+  trainingDefinition   TrainingDefinition  @relation(fields: [trainingDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingDefinitionId, targetType, targetValue])
+  @@map("training_requirements")
+}
+
+enum TrainingTargetType {
+  ALL           // Tüm personel
+  COLLAR_TYPE   // Beyaz/Mavi yaka
+  DEPARTMENT    // Belirli departman
+  POSITION      // Belirli pozisyon
+  EMPLOYEE      // Belirli kişi
 }
 
 enum TrainingCategory {
@@ -1309,6 +1334,7 @@ model CompanyProfile {
   foundedYear   Int?     @map("founded_year")
   logoUrl       String?  @map("logo_url")
   description   String?
+  emailDomain   String?  @default("santiye360.com") @map("email_domain")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

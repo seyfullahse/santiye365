@@ -27,7 +27,12 @@ import {
   ToggleRight,
   Clock,
   LogIn,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  UsersRound,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -166,6 +171,18 @@ export default function KullanicilarPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<AppUser | null>(null);
 
+  // Toplu kullanıcı oluşturma
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkEmployees, setBulkEmployees] = useState<EmployeeInfo[]>([]);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkPassword, setBulkPassword] = useState("123456");
+  const [bulkRole, setBulkRole] = useState("USER");
+  const [bulkSearch, setBulkSearch] = useState("");
+  const [bulkCreating, setBulkCreating] = useState(false);
+  const [bulkResults, setBulkResults] = useState<{ employeeId: string; employeeName: string; success: boolean; email?: string; error?: string }[] | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkEmailDomain, setBulkEmailDomain] = useState("santiye360.com");
+
   const isAuthorized = session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN";
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN" && !(session?.user as any)?.isImpersonating;
 
@@ -204,6 +221,77 @@ export default function KullanicilarPage() {
     }
     fetchUsers();
   }, [session, status, router, isAuthorized, fetchUsers]);
+
+  /* ─── Toplu Oluşturma ─── */
+  const openBulkDialog = async () => {
+    setBulkDialogOpen(true);
+    setBulkSelected(new Set());
+    setBulkPassword("123456");
+    setBulkRole("USER");
+    setBulkSearch("");
+    setBulkResults(null);
+    setBulkLoading(true);
+    try {
+      const [empRes, profileRes] = await Promise.all([
+        fetch("/api/kullanicilar/available-employees"),
+        fetch("/api/organizasyon/profil"),
+      ]);
+      if (empRes.ok) {
+        const data = await empRes.json();
+        setBulkEmployees(data);
+      }
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        if (profileData.emailDomain) setBulkEmailDomain(profileData.emailDomain);
+      }
+    } catch { /* ignore */ } finally { setBulkLoading(false); }
+  };
+
+  const filteredBulkEmployees = bulkEmployees.filter((e) =>
+    `${e.firstName} ${e.lastName} ${e.employeeNo || ""} ${e.department?.name || ""}`
+      .toLowerCase()
+      .includes(bulkSearch.toLowerCase())
+  );
+
+  const toggleBulkSelect = (id: string) => {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleBulkSelectAll = () => {
+    if (bulkSelected.size === filteredBulkEmployees.length) {
+      setBulkSelected(new Set());
+    } else {
+      setBulkSelected(new Set(filteredBulkEmployees.map((e) => e.id)));
+    }
+  };
+
+  const handleBulkCreate = async () => {
+    if (bulkSelected.size === 0) { toast.error("Personel seçin"); return; }
+    setBulkCreating(true);
+    setBulkResults(null);
+    try {
+      const res = await fetch("/api/kullanicilar/toplu-olustur", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employees: Array.from(bulkSelected).map((id) => ({ employeeId: id })),
+          defaultPassword: bulkPassword,
+          defaultRole: bulkRole,
+          emailDomain: bulkEmailDomain,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "İşlem başarısız"); return; }
+      setBulkResults(data.results);
+      if (data.summary.success > 0) toast.success(`${data.summary.success} kullanıcı oluşturuldu`);
+      if (data.summary.fail > 0) toast.warning(`${data.summary.fail} hesap oluşturulamadı`);
+      fetchUsers();
+    } catch { toast.error("Bir hata oluştu"); } finally { setBulkCreating(false); }
+  };
 
   /* ─── Dialog handlers ─── */
   const openNew = () => {
@@ -408,10 +496,16 @@ export default function KullanicilarPage() {
             Sistem kullanıcılarını yönetin, İK çalışanlarına hesap oluşturun
           </p>
         </div>
-        <Button onClick={openNew} className="bg-indigo-600 hover:bg-indigo-700">
-          <UserPlus className="h-4 w-4 mr-2" />
-          Yeni Kullanıcı
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={openBulkDialog} className="gap-1.5">
+            <UsersRound className="h-4 w-4" />
+            Toplu Hesap Oluştur
+          </Button>
+          <Button onClick={openNew} className="bg-indigo-600 hover:bg-indigo-700">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Yeni Kullanıcı
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -859,6 +953,175 @@ export default function KullanicilarPage() {
               {saving ? "Kaydediliyor..." : editingUser ? "Güncelle" : "Oluştur"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toplu Hesap Oluşturma Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={(open) => { setBulkDialogOpen(open); if (!open) setBulkResults(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UsersRound className="h-5 w-5 text-emerald-600" />
+              Toplu Kullanıcı Hesabı Oluştur
+            </DialogTitle>
+            <DialogDescription>
+              İK personellerinden hesabı olmayanlara toplu kullanıcı hesabı oluşturun.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!bulkResults ? (
+            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+              {/* Ayarlar */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Varsayılan Şifre</Label>
+                  <Input value={bulkPassword} onChange={(e) => setBulkPassword(e.target.value)} placeholder="123456" className="h-9" />
+                </div>
+                <div>
+                  <Label className="text-xs">Rol</Label>
+                  <Select value={bulkRole} onValueChange={setBulkRole}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USER">Kullanıcı</SelectItem>
+                      <SelectItem value="VIEWER">İzleyici</SelectItem>
+                      <SelectItem value="MANAGER">Müdür</SelectItem>
+                      <SelectItem value="PROJECT_ADMIN">Proje Yöneticisi</SelectItem>
+                      <SelectItem value="ADMIN">Yönetici</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Personel Ara</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input value={bulkSearch} onChange={(e) => setBulkSearch(e.target.value)} placeholder="Ad, sicil no..." className="pl-8 h-9" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Personel listesi */}
+              <div className="rounded-lg border flex-1 overflow-y-auto min-h-0" style={{ maxHeight: "340px" }}>
+                {bulkLoading ? (
+                  <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" /> Personeller yükleniyor...
+                  </div>
+                ) : filteredBulkEmployees.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <UserX className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Hesabı olmayan personel bulunamadı</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-[40px] text-center py-2">
+                          <Checkbox
+                            checked={filteredBulkEmployees.length > 0 && bulkSelected.size === filteredBulkEmployees.length}
+                            onCheckedChange={toggleBulkSelectAll}
+                          />
+                        </TableHead>
+                        <TableHead className="text-xs py-2">Ad Soyad</TableHead>
+                        <TableHead className="text-xs py-2 hidden sm:table-cell">Sicil No</TableHead>
+                        <TableHead className="text-xs py-2">Departman</TableHead>
+                        <TableHead className="text-xs py-2 hidden md:table-cell">Pozisyon</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredBulkEmployees.map((emp) => (
+                        <TableRow key={emp.id} className="cursor-pointer hover:bg-muted/50" onClick={() => toggleBulkSelect(emp.id)}>
+                          <TableCell className="text-center py-1.5">
+                            <Checkbox checked={bulkSelected.has(emp.id)} onCheckedChange={() => toggleBulkSelect(emp.id)} />
+                          </TableCell>
+                          <TableCell className="text-sm py-1.5 font-medium">{emp.firstName} {emp.lastName}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-muted-foreground hidden sm:table-cell">{emp.employeeNo || "—"}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-muted-foreground">{emp.department?.name || "—"}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-muted-foreground hidden md:table-cell">{emp.position?.name || "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+
+              {/* Bilgi ve buton */}
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-2.5 text-xs text-amber-800 dark:text-amber-300">
+                <ul className="space-y-0.5 list-disc list-inside">
+                  <li>E-posta otomatik: <span className="font-mono">ad.soyad@{bulkEmailDomain}</span></li>
+                  <li>Personel kaydına otomatik bağlanır</li>
+                </ul>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>İptal</Button>
+                <Button
+                  onClick={handleBulkCreate}
+                  disabled={bulkCreating || bulkSelected.size === 0}
+                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {bulkCreating ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Oluşturuluyor...</>
+                  ) : (
+                    <><UserPlus className="h-4 w-4" /> {bulkSelected.size} Hesap Oluştur</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            /* Sonuç ekranı */
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Card className="bg-emerald-50 dark:bg-emerald-950 border-emerald-200">
+                  <CardContent className="py-3 px-4 flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Başarılı</p>
+                      <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{bulkResults.filter(r => r.success).length}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-red-50 dark:bg-red-950 border-red-200">
+                  <CardContent className="py-3 px-4 flex items-center gap-2">
+                    <XCircle className="h-5 w-5 text-red-600" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Başarısız</p>
+                      <p className="text-lg font-bold text-red-700 dark:text-red-400">{bulkResults.filter(r => !r.success).length}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="rounded-lg border max-h-64 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-xs py-2">Personel</TableHead>
+                      <TableHead className="text-xs py-2">Durum</TableHead>
+                      <TableHead className="text-xs py-2">Detay</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bulkResults.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs py-1.5 font-medium">{r.employeeName}</TableCell>
+                        <TableCell className="py-1.5">
+                          {r.success ? (
+                            <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200 bg-emerald-50">Oluşturuldu</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-red-600 border-red-200 bg-red-50">Hata</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs py-1.5 text-muted-foreground">
+                          {r.success ? r.email : r.error}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => { setBulkDialogOpen(false); setBulkResults(null); }}>Kapat</Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

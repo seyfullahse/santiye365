@@ -34,7 +34,7 @@ export function ImpersonationBanner() {
   };
 
   return (
-    <div className="fixed top-0 inset-x-0 z-[100] bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white shadow-lg">
+    <div className="fixed bottom-0 sm:top-0 sm:bottom-auto inset-x-0 z-[100] bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white shadow-lg">
       <div className="mx-auto max-w-7xl px-4 py-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <ShieldAlert className="h-4 w-4 flex-shrink-0 animate-pulse" />

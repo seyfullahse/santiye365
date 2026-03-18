@@ -4,7 +4,12 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const definitions = await prisma.trainingDefinition.findMany({
-      include: { _count: { select: { trainings: true } } },
+      include: {
+        _count: { select: { trainings: true } },
+        requirements: {
+          select: { id: true, targetType: true, targetValue: true },
+        },
+      },
       orderBy: { name: "asc" },
     });
     return NextResponse.json(definitions);
@@ -25,7 +30,18 @@ export async function POST(req: NextRequest) {
         isMandatory: body.isMandatory || false,
         validityMonths: body.validityMonths ? parseInt(body.validityMonths) : null,
         category: body.category || "ISG",
+        requirements: body.requirements?.length
+          ? {
+              createMany: {
+                data: body.requirements.map((r: { targetType: string; targetValue?: string }) => ({
+                  targetType: r.targetType,
+                  targetValue: r.targetValue || null,
+                })),
+              },
+            }
+          : undefined,
       },
+      include: { requirements: true },
     });
     return NextResponse.json(def, { status: 201 });
   } catch (error) {

@@ -18,6 +18,12 @@ export async function GET(req: NextRequest) {
             discipline: { select: { name: true } },
           },
         },
+        employee: {
+          select: {
+            id: true,
+            user: { select: { id: true, email: true } },
+          },
+        },
       },
       orderBy: [
         { team: { company: { sortOrder: "asc" } } },

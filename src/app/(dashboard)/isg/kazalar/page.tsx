@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Siren } from "lucide-react";
+import { Plus, Siren, Search } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface Accident {
   id: string; date: string; location: string; description: string; severity: string; status: string;
@@ -41,6 +42,9 @@ export default function KazalarPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [form, setForm] = useState({
     date: "", location: "", description: "", severity: "MINOR", status: "OPEN_ACCIDENT",
     lostDays: "", projectId: "", involvedEmployeeIds: [] as string[],
@@ -83,6 +87,21 @@ export default function KazalarPage() {
         : [...p.involvedEmployeeIds, id],
     }));
   };
+
+  const filteredAccidents = useMemo(() => {
+    if (!search) return accidents;
+    const s = search.toLowerCase();
+    return accidents.filter((a) =>
+      `${a.location} ${a.description} ${a.involvedEmployees?.map(ie => `${ie.employee.firstName} ${ie.employee.lastName}`).join(" ") || ""}`.toLowerCase().includes(s)
+    );
+  }, [accidents, search]);
+
+  useEffect(() => { setCurrentPage(1); }, [search]);
+
+  const paginatedAccidents = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAccidents.slice(start, start + pageSize);
+  }, [filteredAccidents, currentPage, pageSize]);
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -133,14 +152,22 @@ export default function KazalarPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Arama */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Konum, açıklama veya personel ara..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
       <Card>
         <CardHeader><CardTitle>Kaza Kayıtları</CardTitle></CardHeader>
         <CardContent>
-          {loading ? <div className="text-center py-8 text-muted-foreground">Yükleniyor...</div> : accidents.length === 0 ? <div className="text-center py-8 text-muted-foreground">Kaza kaydı yok</div> : (
+          {loading ? <div className="text-center py-8 text-muted-foreground">Yükleniyor...</div> : filteredAccidents.length === 0 ? <div className="text-center py-8 text-muted-foreground">{accidents.length === 0 ? "Kaza kaydı yok" : "Aramanızla eşleşen kaza kaydı bulunamadı"}</div> : (
+            <>
             <Table>
               <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Konum</TableHead><TableHead>Ciddiyet</TableHead><TableHead>Durum</TableHead><TableHead>İlgili Personel</TableHead><TableHead>Kayıp Gün</TableHead><TableHead>Proje</TableHead></TableRow></TableHeader>
               <TableBody>
-                {accidents.map((a) => (
+                {paginatedAccidents.map((a) => (
                   <TableRow key={a.id}>
                     <TableCell>{new Date(a.date).toLocaleDateString("tr-TR")}</TableCell>
                     <TableCell>{a.location}</TableCell>
@@ -157,6 +184,15 @@ export default function KazalarPage() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              totalItems={filteredAccidents.length}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemLabel="kaza kaydı"
+            />
+            </>
           )}
         </CardContent>
       </Card>
