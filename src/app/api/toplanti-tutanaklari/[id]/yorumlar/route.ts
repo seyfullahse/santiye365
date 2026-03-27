@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 // POST - Yorum ekle
 export async function POST(
@@ -7,8 +8,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
     const body = await request.json();
-    const { itemId, author, content, userId } = body;
+    const { itemId, content } = body;
 
     if (!itemId || !content) {
       return NextResponse.json(
@@ -17,10 +19,14 @@ export async function POST(
       );
     }
 
+    // Kullanıcı adını oturumdan al
+    const authorName = session?.user?.name || "Anonim";
+    const userId = (session?.user as any)?.id || null;
+
     const comment = await prisma.meetingComment.create({
       data: {
         itemId,
-        author: author || "Anonim",
+        author: authorName,
         content,
         userId,
       },

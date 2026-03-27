@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -429,7 +430,6 @@ export default function ToplantiDetayPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemId,
-          author: "Kullanıcı",
           content: commentText,
         }),
       });
