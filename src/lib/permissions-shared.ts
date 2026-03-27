@@ -52,6 +52,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, PermissionS
     "maskot:read": "GLOBAL", "maskot:write": "GLOBAL",
     "ayarlar:read": "GLOBAL", "ayarlar:write": "GLOBAL",
     "roller:read": "GLOBAL", "roller:write": "GLOBAL",
+    "dokumanlar:read": "GLOBAL", "dokumanlar:write": "GLOBAL", "dokumanlar:delete": "GLOBAL",
+    "ai-analytics:read": "GLOBAL",
     "yonetim-paneli:read": "GLOBAL",
   },
   ADMIN: {
@@ -76,6 +78,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, PermissionS
     "maskot:read": "GLOBAL", "maskot:write": "GLOBAL",
     "ayarlar:read": "GLOBAL", "ayarlar:write": "GLOBAL",
     "roller:read": "GLOBAL", "roller:write": "GLOBAL",
+    "dokumanlar:read": "GLOBAL", "dokumanlar:write": "GLOBAL", "dokumanlar:delete": "GLOBAL",
+    "ai-analytics:read": "GLOBAL",
     "yonetim-paneli:read": "GLOBAL",
   },
   PROJECT_ADMIN: {
@@ -90,6 +94,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, PermissionS
     "toplanti:read": "PROJECT", "toplanti:write": "PROJECT",
     "duyurular:read": "GLOBAL",
     "indirimler:read": "GLOBAL",
+    "dokumanlar:read": "PROJECT", "dokumanlar:write": "PROJECT",
     "organizasyon:read": "GLOBAL",
     "ayarlar:read": "SELF",
   },
@@ -105,6 +110,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, PermissionS
     "indirimler:read": "GLOBAL",
     "organizasyon:read": "GLOBAL",
     "toplanti:read": "PROJECT", "toplanti:write": "PROJECT",
+    "dokumanlar:read": "PROJECT",
     "ayarlar:read": "SELF",
   },
   MUHASEBE: {
@@ -115,6 +121,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, PermissionS
     "sirketler:read": "GLOBAL",
     "duyurular:read": "GLOBAL",
     "indirimler:read": "GLOBAL",
+    "dokumanlar:read": "GLOBAL",
     "izin:request": "GLOBAL",
     "ayarlar:read": "SELF",
   },
@@ -127,6 +134,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, PermissionS
     "sirketler:read": "GLOBAL",
     "duyurular:read": "GLOBAL",
     "indirimler:read": "GLOBAL",
+    "dokumanlar:read": "SELF",
     "organizasyon:read": "GLOBAL",
     "ayarlar:read": "SELF",
   },
@@ -171,6 +179,8 @@ export const PAGE_PERMISSION_MAP: Record<string, PermissionCheck> = {
   "/teklif": { module: "teklif", action: "read" },
   "/yatirim": { module: "yatirim", action: "read" },
   "/maskot": { module: "maskot", action: "read" },
+  "/dokumanlar": { module: "dokumanlar", action: "read" },
+  "/ai-analytics": { module: "ai-analytics", action: "read" },
   "/roller": { module: "roller", action: "read" },
   "/ayarlar": { module: "ayarlar", action: "read" },
 };
@@ -249,6 +259,10 @@ export const ALL_PERMISSIONS: { module: string; action: string; description: str
   { module: "yonetim-paneli", action: "read", description: "Yönetim panelini görüntüleme" },
   { module: "roller", action: "read", description: "Rol & yetki matrisini görüntüleme" },
   { module: "roller", action: "write", description: "Rol & yetki matrisini düzenleme" },
+  { module: "dokumanlar", action: "read", description: "Dokümanları görüntüleme" },
+  { module: "dokumanlar", action: "write", description: "Doküman oluşturma/düzenleme" },
+  { module: "dokumanlar", action: "delete", description: "Doküman silme" },
+  { module: "ai-analytics", action: "read", description: "AI Analitik kullanma" },
 ];
 
 /**
@@ -293,5 +307,7 @@ export const SIDEBAR_MODULE_PERMISSIONS: Record<string, SidebarModulePermission>
   "yatirim": { requiredPermission: { module: "yatirim", action: "read" }, label: "Yatırım & GYO" },
   "maskot": { requiredPermission: { module: "maskot", action: "read" }, label: "Maskot AI" },
   "roller": { requiredPermission: { module: "roller", action: "read" }, label: "Rol & Yetki" },
+  "dokumanlar": { requiredPermission: { module: "dokumanlar", action: "read" }, label: "Doküman Yönetimi" },
+  "ai-analytics": { requiredPermission: { module: "ai-analytics", action: "read" }, label: "AI & Analitik" },
   "ayarlar": { requiredPermission: { module: "ayarlar", action: "read" }, label: "Ayarlar" },
 };
