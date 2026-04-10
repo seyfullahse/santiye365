@@ -93,6 +93,8 @@ model Project {
   userPermissions    UserPermission[]
   documentFolders    DocumentFolder[]
   documents          Document[]
+  imalatMahaller      ImalatMahal[]
+  imalatSablonlar     ImalatSablon[]
 
   @@map("projects")
 }
@@ -133,6 +135,7 @@ model Floor {
   zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   activities Activity[]
   materials  MaterialItem[]
+  imalatMahaller ImalatMahal[]
 
   @@map("floors")
 }
@@ -142,8 +145,9 @@ model Discipline {
   id   String @id @default(cuid())
   name String @unique
 
-  activities Activity[]
-  teams      Team[]
+  activities    Activity[]
+  teams         Team[]
+  imalatKalemleri ImalatKalemi[]
 
   @@map("disciplines")
 }
@@ -2765,4 +2769,83 @@ enum DocumentShareAccess {
   VIEW
   EDIT
   ADMIN
+}
+
+// ─── İMALAT TAKİP ────────────────────────────────────────
+
+// Kat içindeki mahal (oda/alan) — örn: "Giriş Koridoru", "Sosyal Alan"
+model ImalatMahal {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  floorId     String   @map("floor_id")
+  name        String
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  floor       Floor          @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  kalemler    ImalatKalemi[]
+
+  @@map("imalat_mahaller")
+}
+
+// Mahal içindeki imalat kalemi
+model ImalatKalemi {
+  id              String          @id @default(cuid())
+  imalatMahalId   String          @map("imalat_mahal_id")
+  siraNo          Int             @default(0) @map("sira_no")
+  imalatAciklama   String        @map("imalat_aciklama")
+  yer              ImalatYer     @default(DIGER) @map("yer")
+  disciplineId    String?         @map("discipline_id")
+  projeDurumu      ImalatProjeDurumu @default(GECERLI) @map("proje_durumu")
+  imalatDurumu     ImalatDurumu   @default(YAPILMADI) @map("imalat_durumu")
+  aksiyon         String?
+  sorumlu         String?
+  ilgiliTaseron   String?         @map("ilgili_taseron")
+  notlar          String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  imalatMahal     ImalatMahal     @relation(fields: [imalatMahalId], references: [id], onDelete: Cascade)
+  discipline      Discipline?     @relation(fields: [disciplineId], references: [id], onDelete: SetNull)
+
+  @@map("imalat_kalemleri")
+}
+
+// Proje bazlı imalat şablonu — yeni mahal eklendiğinde bunlardan seçilir
+model ImalatSablon {
+  id           String          @id @default(cuid())
+  projectId    String          @map("project_id")
+  aciklama     String
+  yer          ImalatYer       @default(DIGER)
+  disiplinAdi  String?         @map("disiplin_adi")
+  varsayilanSira Int           @default(0) @map("varsayilan_sira")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("imalat_sablonlari")
+}
+
+enum ImalatYer {
+  DUVAR
+  TAVAN
+  DOSEME
+  DUVAR_TAVAN
+  ALIN_SAKAL
+  GENEL
+  DIGER
+}
+
+enum ImalatProjeDurumu {
+  GECERLI
+  IPTAL
+  REVIZE
+}
+
+enum ImalatDurumu {
+  YAPILMADI
+  YAPILIYOR
+  TAMAMLANDI
 }

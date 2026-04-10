@@ -129,6 +129,7 @@ function getProjectScopedNav(projectId: string) {
     { name: "Mahaller & Katlar", href: `/projeler/${projectId}/mahaller`, icon: MapPin },
     { name: "Aktiviteler", href: `/projeler/${projectId}/aktiviteler`, icon: Activity },
     { name: "Malzeme Takip", href: `/projeler/${projectId}/malzemeler`, icon: Package },
+    { name: "İmalat Takip", href: `/projeler/${projectId}/imalat-takip`, icon: ListOrdered },
     { name: "Onaylar", href: `/projeler/${projectId}/onaylar`, icon: CheckCircle2 },
     { name: "Riskler", href: `/projeler/${projectId}/riskler`, icon: AlertTriangle },
     { name: "Şirketler", href: `/projeler/${projectId}/sirketler`, icon: Building2 },

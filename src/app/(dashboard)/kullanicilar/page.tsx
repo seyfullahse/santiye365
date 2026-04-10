@@ -795,6 +795,10 @@ export default function KullanicilarPage() {
                     }
                   }}
                   onFocus={() => setShowEmployeeDropdown(true)}
+                  onBlur={() => {
+                    // Dropdown içindeki tıklamanın yakalanması için kısa gecikme
+                    setTimeout(() => setShowEmployeeDropdown(false), 200);
+                  }}
                 />
                 <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 {showEmployeeDropdown && filteredAvailableEmployees.length > 0 && (

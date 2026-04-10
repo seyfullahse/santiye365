@@ -47,6 +47,7 @@ const pageNames: Record<string, string> = {
   mahaller: "Mahaller & Katlar",
   aktiviteler: "Aktiviteler",
   malzemeler: "Malzeme Takip",
+  "imalat-takip": "İmalat Takip",
   sirketler: "Şirketler",
   ekipler: "Ekipler",
   calisanlar: "Çalışanlar",

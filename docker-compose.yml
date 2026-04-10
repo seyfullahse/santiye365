@@ -11,7 +11,7 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_INITDB_ARGS: "--auth-host=trust"
     ports:
-      - "55432:5432"
+      - "55532:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     deploy:
