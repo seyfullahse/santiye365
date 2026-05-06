@@ -46,6 +46,29 @@ SUM(weight × progress_percent) / 100
 
 ## Kurulum
 
+### Windows Hızlı Kurulum (Tek Komut)
+
+Docker Desktop açıkken aşağıdaki komut tüm adımları otomatik yapar:
+
+```powershell
+npm run setup:win
+```
+
+Scriptin yaptığı işlemler:
+- `npm install`
+- `.env` yoksa `.env.example` dosyasından oluşturma
+- Docker ile `db` servisini ayağa kaldırma
+- Prisma generate + db push
+- Seed yükleme
+- Uygulamayı `npm run dev` ile başlatma
+
+Opsiyonel parametre örnekleri:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-dev.ps1 -NoRun
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-dev.ps1 -SkipSeed
+```
+
 ### Gereksinimler
 
 - Node.js 18+
