@@ -28,12 +28,12 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/santiye360?schema=public
-      AUTH_SECRET: ${AUTH_SECRET:-dev-secret}
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET .env dosyasinda tanimlanmali}
       AUTH_TRUST_HOST: "true"
       AUTH_URL: ${NEXTAUTH_URL:-https://santiye360.org}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://santiye360.org}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-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}
-      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-sk_11e8333df19e0c54effbc3021229a4f17b3a616075385c06}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
       NODE_OPTIONS: "--max-old-space-size=512"
       PORT: 4000
     ports:
