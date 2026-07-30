@@ -1226,9 +1226,18 @@ function PortalContent(props: PortalProps) {
   const [currentPage, setCurrentPage] = useState<PortalPage>("overview");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const now = new Date();
-  const h = now.getHours();
-  const greeting = h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar";
+  // Sunucu ve istemci saatleri farklı olabileceğinden hydration uyuşmazlığını önlemek için
+  // saate bağlı değerler yalnızca mount sonrası (istemci tarafında) hesaplanır.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+  }, []);
+  const greeting = now
+    ? (() => {
+        const h = now.getHours();
+        return h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar";
+      })()
+    : "";
 
   const employeeId = props.employeeId;
 
@@ -1401,7 +1410,7 @@ function PortalContent(props: PortalProps) {
             <div className="mb-5">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{greeting}, {userName.split(" ")[0]} 👋</h1>
               <p className="text-sm text-muted-foreground">
-                {now.toLocaleDateString("tr-TR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                {now?.toLocaleDateString("tr-TR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                 {props.projectInfo && <> • <MapPin className="inline h-3 w-3 mb-0.5" /> {props.projectInfo.name}</>}
               </p>
             </div>
